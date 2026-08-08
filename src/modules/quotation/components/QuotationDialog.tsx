@@ -3,16 +3,33 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
+import { ProductPicker } from "@/modules/product/components/ProductPicker";
 import { quotationSchema, type QuotationFormValues } from "../validations/quotation.validation";
 import { useCreateQuotation, useUpdateQuotation } from "../hooks/useQuotations";
 import { DEFAULT_TERMS } from "../constants/quotation.constants";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { formatCurrency } from "@/lib/utils";
-import type { Quotation } from "../types";
+import type { ProductOption } from "@/modules/product/types";
+import type { Quotation, QuotationPrefill } from "../types";
 
 const inputCls =
-  "w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+  "w-full min-w-0 rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+// Numeric cells: right-aligned so the significant digits stay visible, tabular
+// figures so columns line up, and no native spinner (it stole ~16px of the box,
+// which is what made rates look cut off).
+const numCls = `${inputCls} no-spinner text-right tabular-nums`;
+
+/**
+ * Explicit track widths for the numeric part of a line-item row. Percentage /
+ * `col-span` widths squeezed Rate and GST until a 5-digit price was clipped;
+ * fixed pixel minimums guarantee every number is fully readable, and the row
+ * scrolls horizontally rather than shrinking below them.
+ *
+ * Description is no longer one of these tracks — it is a full-width textarea
+ * above them, because a catalog description runs to many lines (point 5).
+ */
+const ITEM_GRID = "grid gap-2 grid-cols-[minmax(140px,2fr)_72px_90px_70px_116px_80px_88px_32px]";
 
 const blankItem = {
   description: "",
@@ -32,6 +49,8 @@ interface Props {
   value: Quotation | null;
   defaultDocType: "quotation" | "proforma";
   onSuccess: () => void;
+  /** Seed a new document from another record (e.g. "Quote" on a lead row). */
+  prefill?: QuotationPrefill | null;
 }
 
 export function QuotationDialog({
@@ -41,6 +60,7 @@ export function QuotationDialog({
   value,
   defaultDocType,
   onSuccess,
+  prefill,
 }: Props) {
   const createMutation = useCreateQuotation();
   const updateMutation = useUpdateQuotation();
@@ -90,24 +110,37 @@ export function QuotationDialog({
           docType: defaultDocType,
           date: "",
           validUntil: "",
-          customerName: "",
-          customerMobile: "",
-          customerEmail: "",
-          customerAddress: "",
+          customerName: prefill?.customerName ?? "",
+          customerMobile: prefill?.customerMobile ?? "",
+          customerEmail: prefill?.customerEmail ?? "",
+          customerAddress: prefill?.customerAddress ?? "",
           customerGstin: "",
-          customerState: "",
+          customerState: prefill?.customerState ?? "",
           isInterState: false,
-          items: [{ ...blankItem }],
+          items: [
+            {
+              ...blankItem,
+              description: prefill?.description ?? "",
+              kva: prefill?.kva,
+              quantity: prefill?.quantity ?? 1,
+              unitPrice: prefill?.unitPrice ?? 0,
+            },
+          ],
           termsText: DEFAULT_TERMS.join("\n"),
           notes: "",
         });
       }
     }
-  }, [open, mode, value, defaultDocType, form]);
+  }, [open, mode, value, defaultDocType, prefill, form]);
 
   // Live totals preview (backend recomputes authoritatively).
   const watchedItems = form.watch("items");
   const isInterState = form.watch("isInterState");
+  // react-hook-form mutates the field-array in place and hands back the SAME
+  // array reference on every render, so keying the memo on the reference alone
+  // computed zeros once and never recomputed — the preview sat at ₹0.00 no
+  // matter what was typed. Key on the serialised values instead.
+  const itemsKey = JSON.stringify(watchedItems);
   const totals = useMemo(() => {
     let taxable = 0;
     let tax = 0;
@@ -120,7 +153,25 @@ export function QuotationDialog({
     });
     const grand = Math.round(taxable + tax);
     return { taxable, tax, grand };
-  }, [watchedItems]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see itemsKey above
+  }, [itemsKey]);
+
+  /**
+   * Apply a catalog product to line item `i` — Change Request point 4.
+   * The field values come from the server (`quotationDefaults`) so the
+   * auto-fill rule is defined once, next to the catalog data.
+   * shouldDirty/shouldValidate keep the totals preview and validation in step.
+   */
+  function applyProduct(i: number, option: ProductOption) {
+    const d = option.quotationDefaults;
+    const opts = { shouldDirty: true, shouldValidate: true } as const;
+    form.setValue(`items.${i}.description`, d.description, opts);
+    form.setValue(`items.${i}.model`, d.model, opts);
+    if (d.kva !== undefined && d.kva !== null) form.setValue(`items.${i}.kva`, d.kva, opts);
+    form.setValue(`items.${i}.hsnCode`, d.hsnCode, opts);
+    form.setValue(`items.${i}.unitPrice`, d.unitPrice, opts);
+    form.setValue(`items.${i}.taxRate`, d.taxRate, opts);
+  }
 
   async function onSubmit(data: QuotationFormValues) {
     try {
@@ -247,78 +298,107 @@ export function QuotationDialog({
               <Plus className="h-3 w-3" /> Add item
             </button>
           </div>
-          {/* Column headers — placeholders vanish once a box has a value, so
-              these labels keep every column identifiable. */}
-          <div className="hidden sm:grid grid-cols-12 gap-2 px-2 mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-            <div className="col-span-4">Description</div>
-            <div className="col-span-2">Model</div>
-            <div className="col-span-1">KVA</div>
-            <div className="col-span-1">HSN</div>
-            <div className="col-span-1">Qty</div>
-            <div className="col-span-1">Rate (₹)</div>
-            <div className="col-span-1">Disc %</div>
-            <div className="col-span-1">GST %</div>
-          </div>
           <div className="space-y-2">
             {fields.map((field, i) => (
               <div key={field.id} className="rounded-lg border border-border p-2">
-                <div className="grid grid-cols-12 gap-2">
-                  <input
-                    className={`${inputCls} col-span-12 sm:col-span-4`}
-                    placeholder="Description *"
-                    {...form.register(`items.${i}.description`)}
-                  />
-                  <input
-                    className={`${inputCls} col-span-6 sm:col-span-2`}
-                    placeholder="Model"
-                    {...form.register(`items.${i}.model`)}
-                  />
-                  <input
-                    type="number"
-                    className={`${inputCls} col-span-3 sm:col-span-1`}
-                    placeholder="KVA"
-                    {...form.register(`items.${i}.kva`)}
-                  />
-                  <input
-                    className={`${inputCls} col-span-3 sm:col-span-1`}
-                    placeholder="HSN"
-                    {...form.register(`items.${i}.hsnCode`)}
-                  />
-                  <input
-                    type="number"
-                    className={`${inputCls} col-span-2 sm:col-span-1`}
-                    placeholder="Qty"
-                    {...form.register(`items.${i}.quantity`)}
-                  />
-                  <input
-                    type="number"
-                    className={`${inputCls} col-span-4 sm:col-span-1`}
-                    placeholder="Rate"
-                    {...form.register(`items.${i}.unitPrice`)}
-                  />
-                  <input
-                    type="number"
-                    className={`${inputCls} col-span-3 sm:col-span-1`}
-                    placeholder="Disc%"
-                    {...form.register(`items.${i}.discountPct`)}
-                  />
-                  <div className="col-span-3 sm:col-span-1 flex items-center gap-1">
-                    <input
-                      type="number"
-                      className={inputCls}
-                      placeholder="GST%"
-                      {...form.register(`items.${i}.taxRate`)}
+                {/* Catalog picker + description. Choosing a product fills the
+                    description, model, KVA, HSN, rate and GST in one go
+                    (Change Request points 4 + 5); free text still works. */}
+                <div className="mb-2 flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <label
+                      className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+                      htmlFor={`item-description-${i}`}
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      id={`item-description-${i}`}
+                      rows={2}
+                      className={`${inputCls} resize-y leading-relaxed`}
+                      placeholder="Description *"
+                      {...form.register(`items.${i}.description`)}
                     />
-                    {fields.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => remove(i)}
-                        className="rounded-md p-1 text-destructive hover:bg-destructive/10"
-                        aria-label="Remove item"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
+                  </div>
+                  <div className="w-44 shrink-0 pt-[22px]">
+                    <ProductPicker
+                      data-testid={`product-picker-${i}`}
+                      onSelect={(option) => applyProduct(i, option)}
+                    />
+                  </div>
+                </div>
+
+                {/* Numeric columns — scroll as a unit so they never shrink
+                    below a readable width. */}
+                <div className="overflow-x-auto pb-1">
+                  <div className="min-w-[740px]">
+                    <div
+                      className={`${ITEM_GRID} mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground`}
+                    >
+                      <div>Model</div>
+                      <div className="text-right">KVA</div>
+                      <div>HSN</div>
+                      <div className="text-right">Qty</div>
+                      <div className="text-right">Rate (₹)</div>
+                      <div className="text-right">Disc %</div>
+                      <div className="text-right">GST %</div>
+                      <div />
+                    </div>
+                    <div className={ITEM_GRID}>
+                      <input
+                        className={inputCls}
+                        placeholder="Model"
+                        {...form.register(`items.${i}.model`)}
+                      />
+                      <input
+                        type="number"
+                        step="0.5"
+                        className={numCls}
+                        placeholder="KVA"
+                        {...form.register(`items.${i}.kva`)}
+                      />
+                      <input
+                        className={inputCls}
+                        placeholder="HSN"
+                        {...form.register(`items.${i}.hsnCode`)}
+                      />
+                      <input
+                        type="number"
+                        className={numCls}
+                        placeholder="Qty"
+                        {...form.register(`items.${i}.quantity`)}
+                      />
+                      <input
+                        type="number"
+                        className={numCls}
+                        placeholder="Rate"
+                        {...form.register(`items.${i}.unitPrice`)}
+                      />
+                      <input
+                        type="number"
+                        className={numCls}
+                        placeholder="Disc%"
+                        {...form.register(`items.${i}.discountPct`)}
+                      />
+                      <input
+                        type="number"
+                        className={numCls}
+                        placeholder="GST%"
+                        {...form.register(`items.${i}.taxRate`)}
+                      />
+                      <div className="flex items-center justify-center">
+                        {fields.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => remove(i)}
+                            className="rounded-md p-1 text-destructive hover:bg-destructive/10"
+                            aria-label="Remove item"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 {errors.items?.[i]?.description && (

@@ -8,16 +8,35 @@ import { toast } from "@/shared/lib/toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { PageLoader } from "@/shared/components/PageLoader";
 
+const filterInputCls =
+  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+
+/** Blank quantity boxes must mean "no filter", not 0. */
+function toQty(v: string): number | undefined {
+  const n = Number(v);
+  return v.trim() === "" || Number.isNaN(n) ? undefined : n;
+}
+
 export function SaleListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canRecord = role === "admin" || role === "sales" || role === "inventory";
   const canDelete = role === "admin";
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [location, setLocation] = useState("");
+  const [minQty, setMinQty] = useState("");
+  const [maxQty, setMaxQty] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useSales({ search: search || undefined, page, limit: 50 });
+  const { data, isLoading, refetch } = useSales({
+    search: search || undefined,
+    location: location.trim() || undefined,
+    minQuantity: toQty(minQty),
+    maxQuantity: toQty(maxQty),
+    page,
+    limit: 50,
+  });
   const deleteMutation = useDeleteSale();
   const sales = data?.items ?? [];
   const total = data?.meta.total ?? 0;
@@ -60,24 +79,82 @@ export function SaleListPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
-        <input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Customer or model..."
-          className="w-full max-w-lg rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-        />
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-wrap items-end gap-3">
+        <div className="flex-1 min-w-[220px]">
+          <label
+            className="block text-xs font-medium text-muted-foreground mb-1"
+            htmlFor="sale-search"
+          >
+            Search
+          </label>
+          <input
+            id="sale-search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Customer or model..."
+            className={filterInputCls}
+          />
+        </div>
+        <div className="min-w-[150px]">
+          <label
+            className="block text-xs font-medium text-muted-foreground mb-1"
+            htmlFor="sale-location-filter"
+          >
+            Location
+          </label>
+          <input
+            id="sale-location-filter"
+            value={location}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Branch / godown..."
+            className={filterInputCls}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">
+            Qty (min–max)
+          </label>
+          <div className="flex items-center gap-1">
+            <input
+              aria-label="Minimum quantity"
+              type="number"
+              min={1}
+              value={minQty}
+              onChange={(e) => {
+                setMinQty(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Min"
+              className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+            />
+            <span className="text-muted-foreground">–</span>
+            <input
+              aria-label="Maximum quantity"
+              type="number"
+              min={1}
+              value={maxQty}
+              onChange={(e) => {
+                setMaxQty(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Max"
+              className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+            />
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
         <PageLoader />
       ) : (
         <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full text-sm min-w-[1000px]">
+          <table className="w-full text-sm min-w-[1100px]">
             <thead className="border-b border-border bg-muted/40">
               <tr>
                 {[
@@ -86,6 +163,7 @@ export function SaleListPage() {
                   "Customer",
                   "Model",
                   "KVA",
+                  "Location",
                   "Qty",
                   "Unit ₹",
                   "Total ₹",
@@ -103,7 +181,10 @@ export function SaleListPage() {
             <tbody className="divide-y divide-border">
               {sales.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                  <td
+                    colSpan={canDelete ? 9 : 8}
+                    className="px-4 py-12 text-center text-muted-foreground"
+                  >
                     No sales recorded yet.
                   </td>
                 </tr>
@@ -124,6 +205,7 @@ export function SaleListPage() {
                     <td className="px-4 py-2.5 font-medium">{s.customerName}</td>
                     <td className="px-4 py-2.5">{s.modelName}</td>
                     <td className="px-4 py-2.5 font-mono">{s.kva ?? "-"}</td>
+                    <td className="px-4 py-2.5">{s.location || "-"}</td>
                     <td className="px-4 py-2.5">{s.quantity}</td>
                     <td className="px-4 py-2.5">{formatCurrency(s.unitPrice)}</td>
                     <td className="px-4 py-2.5 font-semibold">{formatCurrency(s.totalAmount)}</td>

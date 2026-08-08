@@ -61,6 +61,7 @@ export function LeadDialog({ open, onOpenChange, mode, value, onSuccess }: Props
     defaultValues: {
       customerName: "",
       mobile: "",
+      quantity: 1,
       fuelType: "any",
       source: "walk_in",
       status: "new",
@@ -84,6 +85,7 @@ export function LeadDialog({ open, onOpenChange, mode, value, onSuccess }: Props
               state: value.state ?? "",
               requirement: value.requirement ?? "",
               requiredKva: value.requiredKva,
+              quantity: value.quantity ?? 1,
               fuelType: value.fuelType ?? "any",
               estimatedValue: value.estimatedValue ?? 0,
               source: value.source,
@@ -104,6 +106,7 @@ export function LeadDialog({ open, onOpenChange, mode, value, onSuccess }: Props
               state: "",
               requirement: "",
               requiredKva: undefined,
+              quantity: 1,
               fuelType: "any",
               estimatedValue: 0,
               source: "walk_in",
@@ -185,6 +188,9 @@ export function LeadDialog({ open, onOpenChange, mode, value, onSuccess }: Props
         </Field>
         <Field label="Required KVA" error={errors.requiredKva?.message}>
           <input type="number" step="0.5" className={inputCls} {...form.register("requiredKva")} />
+        </Field>
+        <Field label="Quantity (units)" error={errors.quantity?.message}>
+          <input type="number" min={1} className={inputCls} {...form.register("quantity")} />
         </Field>
         <Field label="Fuel Type">
           <select className={inputCls} {...form.register("fuelType")}>

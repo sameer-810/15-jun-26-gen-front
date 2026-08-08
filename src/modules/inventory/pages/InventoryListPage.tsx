@@ -22,6 +22,14 @@ import type { Inventory, InventoryListQuery, FuelType } from "../types";
 
 const filterSelectCls =
   "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+const filterInputCls =
+  "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+
+/** Blank quantity boxes must mean "no filter", not 0. */
+function toQty(v: string): number | undefined {
+  const n = Number(v);
+  return v.trim() === "" || Number.isNaN(n) ? undefined : n;
+}
 
 export function InventoryListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
@@ -30,6 +38,9 @@ export function InventoryListPage() {
 
   const [fuelType, setFuelType] = useState<FuelType | "">("");
   const [lowOnly, setLowOnly] = useState(false);
+  const [location, setLocation] = useState("");
+  const [minQty, setMinQty] = useState("");
+  const [maxQty, setMaxQty] = useState("");
   const [stockItem, setStockItem] = useState<Inventory | null>(null);
   const [stockOpen, setStockOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,7 +110,7 @@ export function InventoryListPage() {
         subtitle="Generator models in stock"
         newButtonText="New Model"
         searchPlaceholder="Search by model or brand..."
-        minTableWidth="min-w-[1050px]"
+        minTableWidth="min-w-[1200px]"
         emptyText="No inventory yet. Add your first generator model."
         deleteConfirmText="Delete this model from inventory? Sale history is retained."
         hideCreateButton={!canManage}
@@ -116,6 +127,7 @@ export function InventoryListPage() {
           { header: "KVA", getValue: (i) => i.kva, className: "font-mono font-semibold" },
           { header: "Fuel", getValue: (i) => FUEL_LABELS[i.fuelType] },
           { header: "Phase", getValue: (i) => PHASE_LABELS[i.phase] },
+          { header: "Location", getValue: (i) => i.location || "-" },
           {
             header: "Available",
             getValue: (i) => <span className="font-semibold">{i.availableQuantity}</span>,
@@ -142,6 +154,9 @@ export function InventoryListPage() {
           search: search || undefined,
           fuelType: fuelType || undefined,
           lowStock: lowOnly || undefined,
+          location: location.trim() || undefined,
+          minQuantity: toQty(minQty),
+          maxQuantity: toQty(maxQty),
           page,
           limit,
         })}
@@ -156,9 +171,56 @@ export function InventoryListPage() {
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
               />
             </div>
+            <div className="min-w-[150px]">
+              <label
+                className="block text-xs font-medium text-muted-foreground mb-1"
+                htmlFor="inventory-location-filter"
+              >
+                Location
+              </label>
+              <input
+                id="inventory-location-filter"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Branch / godown..."
+                className={filterInputCls}
+              />
+            </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Fuel</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Qty (min–max)
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  aria-label="Minimum available quantity"
+                  type="number"
+                  min={0}
+                  value={minQty}
+                  onChange={(e) => setMinQty(e.target.value)}
+                  placeholder="Min"
+                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                />
+                <span className="text-muted-foreground">–</span>
+                <input
+                  aria-label="Maximum available quantity"
+                  type="number"
+                  min={0}
+                  value={maxQty}
+                  onChange={(e) => setMaxQty(e.target.value)}
+                  placeholder="Max"
+                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                className="block text-xs font-medium text-muted-foreground mb-1"
+                htmlFor="inventory-fuel-filter"
+              >
+                Fuel
+              </label>
               <select
+                id="inventory-fuel-filter"
                 className={filterSelectCls}
                 value={fuelType}
                 onChange={(e) => setFuelType(e.target.value as FuelType | "")}

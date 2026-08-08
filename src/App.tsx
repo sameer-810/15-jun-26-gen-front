@@ -29,6 +29,11 @@ const InventoryListPage = lazy(() =>
     default: m.InventoryListPage,
   })),
 );
+const ProductListPage = lazy(() =>
+  import("./modules/product/pages/ProductListPage").then((m) => ({
+    default: m.ProductListPage,
+  })),
+);
 const SaleListPage = lazy(() =>
   import("./modules/sale/pages/SaleListPage").then((m) => ({ default: m.SaleListPage })),
 );
@@ -64,6 +69,7 @@ export default function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="leads" element={<LeadListPage />} />
           <Route path="capacity-calculator" element={<CapacityCalculatorPage />} />
+          <Route path="catalog" element={<ProductListPage />} />
           <Route path="inventory" element={<InventoryListPage />} />
           <Route path="sales" element={<SaleListPage />} />
           <Route path="quotations" element={<QuotationListPage />} />

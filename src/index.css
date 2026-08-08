@@ -120,6 +120,19 @@ body,
   @apply space-y-6 animate-fade-in;
 }
 
+/* Number inputs in dense grids (quotation/PI line items). The native spinner
+   steals ~16px of an already-narrow box — enough to clip a 5-digit rate — and
+   is useless for currency, so hide it and let the digits have the width. */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.no-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 /* ── 2026 polish ──────────────────────────────────────────────────────────── */
 
 /* Brand gradient text helper for headers — cobalt → sky. */

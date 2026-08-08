@@ -10,6 +10,18 @@ export const updateLead = (id: string, payload: Partial<LeadCreatePayload>) =>
   api.update(id, payload);
 export const deleteLead = (id: string) => api.remove(id);
 
+/**
+ * Admin-only bulk clear-out. The server only removes dead leads (Not Interested
+ * / Irrelevant) and reports how many of the selection it skipped.
+ */
+export async function bulkDeleteLeads(ids: string[]) {
+  const res = await http.post<{ data: { deleted: number; skipped: number }; message: string }>(
+    "/leads/bulk-delete",
+    { ids },
+  );
+  return res.data.data;
+}
+
 export async function addFollowUp(
   id: string,
   payload: { note: string; nextFollowUpDate?: string },

@@ -6,6 +6,7 @@ export const inventorySchema = z.object({
   kva: z.coerce.number().min(0, "KVA is required"),
   fuelType: z.enum(["diesel", "gas", "petrol"]),
   phase: z.enum(["single", "three"]),
+  location: z.string().trim().optional(),
   availableQuantity: z.coerce.number().int().min(0).optional(),
   lowStockThreshold: z.coerce.number().int().min(0),
   purchasePrice: z.coerce.number().min(0).optional(),

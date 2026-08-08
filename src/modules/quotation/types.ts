@@ -80,6 +80,24 @@ export type QuotationItemPayload = {
   taxRate?: number;
 };
 
+/**
+ * Seed values for a brand-new document raised from somewhere else in the CRM
+ * (today: the "Quote" button on a lead row). Deliberately a plain shape rather
+ * than a Lead, so the quotation module stays independent of the lead module.
+ */
+export type QuotationPrefill = {
+  customerName: string;
+  customerMobile?: string;
+  customerEmail?: string;
+  customerAddress?: string;
+  customerState?: string;
+  /** Becomes the first line item's description. */
+  description?: string;
+  kva?: number;
+  quantity?: number;
+  unitPrice?: number;
+};
+
 export type QuotationCreatePayload = {
   docType: DocType;
   date?: string;

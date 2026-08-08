@@ -3,6 +3,7 @@ import {
   Target,
   Calculator,
   FileText,
+  BookOpen,
   Boxes,
   ReceiptIndianRupee,
   BarChart3,
@@ -57,6 +58,12 @@ const SECTIONS: MenuSection[] = [
   {
     heading: "Operations",
     items: [
+      {
+        label: "Product Catalog",
+        to: "/catalog",
+        icon: BookOpen,
+        roles: ["admin", "manager", "inventory", "sales"],
+      },
       {
         label: "Inventory",
         to: "/inventory",

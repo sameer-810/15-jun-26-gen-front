@@ -9,6 +9,8 @@ export type Inventory = {
   kva: number;
   fuelType: FuelType;
   phase: Phase;
+  /** Branch/godown holding this stock. */
+  location?: string;
   availableQuantity: number;
   soldQuantity: number;
   totalQuantity: number;
@@ -28,6 +30,10 @@ export type InventoryListQuery = {
   search?: string;
   fuelType?: FuelType;
   lowStock?: boolean;
+  location?: string;
+  /** Bounds on units currently available. */
+  minQuantity?: number;
+  maxQuantity?: number;
   page: number;
   limit: number;
 };
@@ -50,6 +56,7 @@ export type InventoryCreatePayload = {
   kva: number;
   fuelType?: FuelType;
   phase?: Phase;
+  location?: string;
   availableQuantity?: number;
   lowStockThreshold?: number;
   purchasePrice?: number;

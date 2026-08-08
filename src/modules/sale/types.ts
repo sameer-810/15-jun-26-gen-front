@@ -10,6 +10,8 @@ export type Sale = {
   quantity: number;
   unitPrice: number;
   totalAmount: number;
+  /** Branch/godown the units were dispatched from. */
+  location?: string;
   customerName: string;
   customerMobile?: string;
   leadId?: string | null;
@@ -25,6 +27,9 @@ export type SaleListQuery = {
   salesExecutive?: string;
   startDate?: string;
   endDate?: string;
+  location?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
   page: number;
   limit: number;
 };
@@ -48,6 +53,7 @@ export type SaleCreatePayload = {
   kva?: number;
   quantity: number;
   unitPrice: number;
+  location?: string;
   saleDate?: string;
   customerName: string;
   customerMobile?: string;

@@ -5,6 +5,7 @@ import {
   createLead,
   updateLead,
   deleteLead,
+  bulkDeleteLeads,
   addFollowUp,
   getDueFollowUps,
   getAssignableUsers,
@@ -24,6 +25,18 @@ export const useLeads = crud.useList;
 export const useCreateLead = crud.useCreate;
 export const useUpdateLead = crud.useUpdate;
 export const useDeleteLead = crud.useDelete;
+
+export function useBulkDeleteLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDeleteLeads(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads", "list"] });
+      qc.invalidateQueries({ queryKey: ["leads", "due"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
 
 export function useAddFollowUp() {
   const qc = useQueryClient();

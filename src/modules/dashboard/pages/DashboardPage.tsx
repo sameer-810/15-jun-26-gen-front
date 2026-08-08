@@ -24,15 +24,29 @@ const AMBER = "#F5A623";
 const GREEN = "#16A34A";
 const STATUS_COLORS: Record<string, string> = {
   new: "#3B82F6",
-  in_progress: "#F59E0B",
+  important: "#F97316",
+  contacted: "#0EA5E9",
+  follow_up: "#F59E0B",
+  quotation_sent: "#EAB308",
+  negotiation: "#8B5CF6",
+  other: "#94A3B8",
+  deal_done: "#10B981",
   converted: "#16A34A",
   not_interested: "#EF4444",
+  irrelevant: "#F43F5E",
 };
 const STATUS_TONE: Record<LeadStatus, "info" | "warning" | "success" | "danger"> = {
   new: "info",
-  in_progress: "warning",
+  important: "warning",
+  contacted: "info",
+  follow_up: "warning",
+  quotation_sent: "warning",
+  negotiation: "warning",
+  other: "info",
+  deal_done: "success",
   converted: "success",
   not_interested: "danger",
+  irrelevant: "danger",
 };
 
 function ChartCard({
@@ -113,11 +127,13 @@ export function DashboardPage() {
   const trend = data?.monthlyLeadTrend ?? [];
   const mix = (data?.leadStatusMix ?? []).filter((m) => m.count > 0);
   const topModels = data?.topModels ?? [];
+  // Four roll-up buckets over the (now much wider) status list — the full
+  // breakdown is in the status-mix chart below.
   const stages: { key: LeadStatus; label: string; count: number }[] = [
     { key: "new", label: "New", count: data?.leads.new ?? 0 },
-    { key: "in_progress", label: "In Progress", count: data?.leads.inProgress ?? 0 },
-    { key: "converted", label: "Converted", count: data?.leads.converted ?? 0 },
-    { key: "not_interested", label: "Not Interested", count: data?.leads.lost ?? 0 },
+    { key: "contacted", label: "Open", count: data?.leads.inProgress ?? 0 },
+    { key: "converted", label: "Won", count: data?.leads.converted ?? 0 },
+    { key: "not_interested", label: "Lost", count: data?.leads.lost ?? 0 },
   ];
 
   return (

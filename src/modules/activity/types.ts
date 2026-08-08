@@ -2,6 +2,7 @@ export type ActivityType =
   | "lead_created"
   | "lead_updated"
   | "lead_status_changed"
+  | "lead_deleted"
   | "follow_up_added"
   | "lead_converted"
   | "quotation_created"

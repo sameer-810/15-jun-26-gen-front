@@ -61,6 +61,7 @@ export function InventoryDialog({ open, onOpenChange, mode, value, onSuccess }: 
               kva: value.kva,
               fuelType: value.fuelType,
               phase: value.phase,
+              location: value.location ?? "",
               availableQuantity: value.availableQuantity,
               lowStockThreshold: value.lowStockThreshold,
               purchasePrice: value.purchasePrice,
@@ -75,6 +76,7 @@ export function InventoryDialog({ open, onOpenChange, mode, value, onSuccess }: 
               kva: 0,
               fuelType: "diesel",
               phase: "three",
+              location: "",
               availableQuantity: 0,
               lowStockThreshold: 2,
               purchasePrice: 0,
@@ -150,6 +152,13 @@ export function InventoryDialog({ open, onOpenChange, mode, value, onSuccess }: 
               </option>
             ))}
           </select>
+        </Field>
+        <Field label="Location" error={errors.location?.message}>
+          <input
+            className={inputCls}
+            placeholder="Branch / godown, e.g. Mumbai Yard"
+            {...form.register("location")}
+          />
         </Field>
         {mode === "create" && (
           <Field label="Opening Stock Qty" error={errors.availableQuantity?.message}>

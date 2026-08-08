@@ -55,6 +55,14 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
     onEdit: (item: TItem) => void,
     onRequestDelete: (id: string) => void,
   ) => React.ReactNode;
+  /**
+   * Enable per-row checkboxes. Return false for a row that must not be
+   * selectable (e.g. a lead that is still live and so can't be bulk-deleted).
+   * Selection is page-local and clears whenever the query changes.
+   */
+  isRowSelectable?: (item: TItem) => boolean;
+  /** Bar rendered above the table while at least one row is selected. */
+  renderBulkActions?: (args: { ids: string[]; clear: () => void }) => React.ReactNode;
 }
 
 export function ResourceListPage<TItem extends { id: string }, TQuery extends object>({
@@ -75,6 +83,8 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   hideDefaultSearch,
   renderDialog,
   renderActions,
+  isRowSelectable,
+  renderBulkActions,
 }: ResourceListPageProps<TItem, TQuery>) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -83,6 +93,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<TItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
 
   const setSearchAndReset = useCallback((v: string) => {
     setSearch(v);
@@ -95,7 +106,9 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
 
   const { data, isLoading, error, refetch } = useList(query);
   const deleteMutation = useDelete?.();
-  const items = data?.items ?? [];
+  // Memoised so downstream useMemo/useEffect deps don't churn on every render
+  // (the `?? []` fallback would otherwise be a fresh array each time).
+  const items = useMemo(() => data?.items ?? [], [data]);
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, data?.meta?.totalPages ?? 1);
   const hasNext = data?.meta?.hasNextPage ?? false;
@@ -106,6 +119,34 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   useEffect(() => {
     if (!isLoading && page > totalPages) setPage(totalPages);
   }, [page, totalPages, isLoading]);
+
+  // Selection is page-local: changing the page, search or any filter clears it
+  // so a bulk action can never reach rows the user is no longer looking at.
+  // Keyed on the serialised query because `buildQuery` is an inline arrow in
+  // every caller, so `query` is a fresh object on each render — depending on
+  // its identity would wipe the selection the instant it was made.
+  const queryKey = JSON.stringify(query);
+  useEffect(() => {
+    setSelected([]);
+  }, [queryKey]);
+
+  const selectableIds = useMemo(
+    () => (isRowSelectable ? items.filter(isRowSelectable).map((i) => i.id) : []),
+    [items, isRowSelectable],
+  );
+  const allSelected = selectableIds.length > 0 && selected.length === selectableIds.length;
+  const clearSelection = useCallback(() => setSelected([]), []);
+  const toggleRow = useCallback(
+    (id: string) =>
+      setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])),
+    [],
+  );
+  const toggleAll = useCallback(
+    () => setSelected((prev) => (prev.length === selectableIds.length ? [] : selectableIds)),
+    [selectableIds],
+  );
+  const selectionEnabled = Boolean(isRowSelectable);
+  const extraCols = (hideActionsColumn ? 0 : 1) + (selectionEnabled ? 1 : 0);
 
   const onEdit = useCallback((item: TItem) => {
     setMode("edit");
@@ -193,11 +234,45 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         </div>
       ) : null}
 
+      {/* Bulk action bar — only while a selection exists */}
+      {selectionEnabled && selected.length > 0 && renderBulkActions && (
+        <div
+          data-testid="bulk-action-bar"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 shadow-sm"
+        >
+          <span className="text-sm font-medium text-foreground">
+            {selected.length} selected on this page
+          </span>
+          <div className="flex items-center gap-2">
+            {renderBulkActions({ ids: selected, clear: clearSelection })}
+            <button
+              onClick={clearSelection}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm min-h-[400px]">
         <table className={cn("w-full text-sm", minTableWidth)}>
           <thead className="border-b border-border bg-muted/40">
             <tr>
+              {selectionEnabled && (
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all deletable rows on this page"
+                    data-testid="select-all"
+                    disabled={selectableIds.length === 0}
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    className="h-4 w-4 rounded border-input accent-primary disabled:opacity-40"
+                  />
+                </th>
+              )}
               {!hideActionsColumn && (
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground w-40">
                   Actions
@@ -217,7 +292,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={columns.length + (hideActionsColumn ? 0 : 1)}
+                  colSpan={columns.length + extraCols}
                   className="px-4 py-12 text-center text-muted-foreground"
                 >
                   <div className="flex justify-center">
@@ -228,7 +303,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             ) : items.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length + (hideActionsColumn ? 0 : 1)}
+                  colSpan={columns.length + extraCols}
                   className="px-4 py-12 text-center text-muted-foreground"
                 >
                   {emptyText}
@@ -237,6 +312,20 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                  {selectionEnabled && (
+                    <td className="px-4 py-2.5">
+                      {isRowSelectable?.(item) ? (
+                        <input
+                          type="checkbox"
+                          aria-label="Select row"
+                          data-testid={`select-row-${item.id}`}
+                          checked={selected.includes(item.id)}
+                          onChange={() => toggleRow(item.id)}
+                          className="h-4 w-4 rounded border-input accent-primary"
+                        />
+                      ) : null}
+                    </td>
+                  )}
                   {!hideActionsColumn && (
                     <td className="px-4 py-2.5">
                       {renderActions ? (

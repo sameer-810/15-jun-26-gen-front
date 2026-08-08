@@ -1,4 +1,15 @@
-export type LeadStatus = "new" | "in_progress" | "converted" | "not_interested";
+export type LeadStatus =
+  | "new"
+  | "important"
+  | "contacted"
+  | "follow_up"
+  | "quotation_sent"
+  | "negotiation"
+  | "other"
+  | "deal_done"
+  | "converted"
+  | "not_interested"
+  | "irrelevant";
 export type LeadSource =
   | "walk_in"
   | "referral"
@@ -31,11 +42,14 @@ export type Lead = {
   state?: string;
   requirement?: string;
   requiredKva?: number;
+  quantity: number;
   fuelType?: FuelType;
   estimatedValue?: number;
   source: LeadSource;
   status: LeadStatus;
   lostReason?: string;
+  /** Enquiry timestamp at the source (IndiaMART etc.); absent for manual leads. */
+  externalCreatedAt?: string;
   assignedTo: UserRef;
   createdBy: UserRef;
   nextFollowUpDate?: string;
@@ -51,6 +65,10 @@ export type LeadListQuery = {
   status?: LeadStatus;
   source?: LeadSource;
   assignedTo?: string;
+  /** Matched against the lead's city, case-insensitive substring. */
+  location?: string;
+  minQuantity?: number;
+  maxQuantity?: number;
   page: number;
   limit: number;
 };
@@ -77,6 +95,7 @@ export type LeadCreatePayload = {
   state?: string;
   requirement?: string;
   requiredKva?: number;
+  quantity?: number;
   fuelType?: FuelType;
   estimatedValue?: number;
   source?: LeadSource;

@@ -10,6 +10,7 @@ import {
   PackagePlus,
   Boxes,
   StickyNote,
+  Trash2,
 } from "lucide-react";
 import type { ActivityType, EntityType } from "../types";
 
@@ -20,6 +21,7 @@ export const ACTIVITY_META: Record<
   lead_created: { label: "Lead Created", icon: UserPlus, color: "text-blue-500" },
   lead_updated: { label: "Lead Updated", icon: Pencil, color: "text-slate-500" },
   lead_status_changed: { label: "Status Changed", icon: ArrowRightLeft, color: "text-amber-500" },
+  lead_deleted: { label: "Lead Deleted", icon: Trash2, color: "text-red-500" },
   follow_up_added: { label: "Follow-up", icon: MessageSquare, color: "text-indigo-500" },
   lead_converted: { label: "Lead Converted", icon: CheckCircle2, color: "text-green-500" },
   quotation_created: { label: "Quotation", icon: FileText, color: "text-primary" },

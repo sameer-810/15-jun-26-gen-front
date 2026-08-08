@@ -26,6 +26,7 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
   const [customerName, setCustomerName] = useState("");
   const [customerMobile, setCustomerMobile] = useState("");
   const [saleDate, setSaleDate] = useState("");
+  const [location, setLocation] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -35,6 +36,7 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
       setCustomerName("");
       setCustomerMobile("");
       setSaleDate("");
+      setLocation("");
     }
   }, [open]);
 
@@ -42,6 +44,9 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
     setInventoryId(id);
     const item = items.find((i) => i.id === id);
     if (item && item.sellingPrice) setUnitPrice(item.sellingPrice);
+    // Default the dispatch location to wherever that stock is held; the user
+    // can still override it before recording.
+    if (item) setLocation(item.location ?? "");
   }
 
   const selected = items.find((i) => i.id === inventoryId);
@@ -64,6 +69,7 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
         customerName: customerName.trim(),
         customerMobile: customerMobile.trim() || undefined,
         saleDate: saleDate || undefined,
+        location: location.trim() || undefined,
       });
       toast.success("Sale recorded; stock updated");
       onOpenChange(false);
@@ -155,6 +161,21 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
             className={inputCls}
             value={saleDate}
             onChange={(e) => setSaleDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <label
+            className="block text-xs font-medium text-muted-foreground mb-1"
+            htmlFor="sale-location"
+          >
+            Location
+          </label>
+          <input
+            id="sale-location"
+            className={inputCls}
+            placeholder="Dispatch branch / godown"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
           />
         </div>
         <div className="flex items-end">

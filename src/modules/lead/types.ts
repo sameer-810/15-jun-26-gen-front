@@ -48,6 +48,8 @@ export type Lead = {
   source: LeadSource;
   status: LeadStatus;
   lostReason?: string;
+  /** User-defined labels, independent of the pipeline status. */
+  labels: { id: string; name: string; color: string }[];
   /** Enquiry timestamp at the source (IndiaMART etc.); absent for manual leads. */
   externalCreatedAt?: string;
   assignedTo: UserRef;

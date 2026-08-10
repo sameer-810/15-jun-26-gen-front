@@ -1,13 +1,31 @@
 import { useState } from "react";
-import { Pencil, FileText, MessageCircle, Download } from "lucide-react";
+import {
+  Pencil,
+  FileText,
+  MessageCircle,
+  Download,
+  Lock,
+  ArrowRightCircle,
+  Wand2,
+} from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { QuotationDialog } from "../components/QuotationDialog";
-import { useQuotations, useDeleteQuotation, useSetQuotationStatus } from "../hooks/useQuotations";
+import { QuotationWizard } from "../components/QuotationWizard";
+import {
+  useQuotations,
+  useDeleteQuotation,
+  useSetQuotationStatus,
+  useIssueQuotation,
+  useConvertQuotation,
+} from "../hooks/useQuotations";
 import { quotationPdfPath } from "../api/quotationApi";
 import {
   DOC_STATUS_LABELS,
   DOC_STATUS_COLORS,
   DOC_STATUSES,
+  DOC_TYPE_LABELS,
+  DOC_TYPE_PLURALS,
+  DOC_TYPES,
 } from "../constants/quotation.constants";
 import { openAuthenticatedPdf, downloadAuthenticatedPdf } from "@/shared/lib/openAuthenticatedPdf";
 import { shareViaWhatsApp } from "@/shared/lib/shareDocument";
@@ -17,16 +35,49 @@ import { toast } from "@/shared/lib/toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Quotation, QuotationListQuery, DocType, DocStatus } from "../types";
 
-const TABS: { key: DocType; label: string }[] = [
-  { key: "quotation", label: "Quotations" },
-  { key: "proforma", label: "Proforma Invoices" },
-];
+const TABS: { key: DocType; label: string }[] = DOC_TYPES.map((key) => ({
+  key,
+  label: DOC_TYPE_PLURALS[key],
+}));
 
 export function QuotationListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canDelete = role === "admin";
+  // Issuing locks a tax invoice for good, so it is a manager-level action —
+  // mirrors the server-side guard on POST /quotations/:id/issue.
+  const canIssue = role === "admin" || role === "manager";
   const [docType, setDocType] = useState<DocType>("quotation");
   const statusMutation = useSetQuotationStatus();
+  const issueMutation = useIssueQuotation();
+  const convertMutation = useConvertQuotation();
+  const [confirmIssue, setConfirmIssue] = useState<Quotation | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  // ResourceListPage owns its own paging/query state, so bumping this key is
+  // how an outside creation (the wizard) forces it to reload.
+  const [listRefreshKey, setListRefreshKey] = useState(0);
+
+  async function convertToInvoice(q: Quotation) {
+    try {
+      const created = await convertMutation.mutateAsync({ id: q.id, targetType: "invoice" });
+      toast.success(
+        `Tax invoice ${created.docNumberFormatted} created from ${q.docNumberFormatted}`,
+      );
+      setDocType("invoice");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
+
+  async function issue() {
+    if (!confirmIssue) return;
+    try {
+      const issued = await issueMutation.mutateAsync(confirmIssue.id);
+      toast.success(`${issued.docNumberFormatted} issued`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+    setConfirmIssue(null);
+  }
 
   async function viewPdf(q: Quotation) {
     try {
@@ -79,11 +130,26 @@ export function QuotationListPage() {
         ))}
       </div>
 
+      {/* Point 15 — the catalog-driven builder, alongside the plain dialog. */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setWizardOpen(true)}
+          data-testid="open-wizard"
+          className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+        >
+          <Wand2 className="h-4 w-4" /> Build from catalog
+        </button>
+      </div>
+
       <ResourceListPage<Quotation, QuotationListQuery>
-        key={docType}
-        title={docType === "quotation" ? "Quotations" : "Proforma Invoices"}
-        subtitle="GST-enabled documents with PDF & share"
-        newButtonText={docType === "quotation" ? "New Quotation" : "New Proforma"}
+        key={`${docType}-${listRefreshKey}`}
+        title={DOC_TYPE_PLURALS[docType]}
+        subtitle={
+          docType === "invoice"
+            ? "Statutory GST invoices — numbered per financial year and locked once issued"
+            : "GST-enabled documents with PDF & share"
+        }
+        newButtonText={`New ${DOC_TYPE_LABELS[docType]}`}
         searchPlaceholder="Search by customer or number..."
         minTableWidth="min-w-[1100px]"
         emptyText="No documents yet. Create your first one."
@@ -92,7 +158,17 @@ export function QuotationListPage() {
           {
             header: "Number",
             getValue: (q) => (
-              <span className="font-mono font-semibold text-primary">{q.docNumberFormatted}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono font-semibold text-primary">{q.docNumberFormatted}</span>
+                {q.isIssued && (
+                  <span
+                    title={`Issued ${q.issuedAt ? formatDate(q.issuedAt) : ""} — read-only`}
+                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                  >
+                    <Lock className="h-2.5 w-2.5" /> Issued
+                  </span>
+                )}
+              </div>
             ),
           },
           { header: "Date", getValue: (q) => formatDate(q.date) },
@@ -116,6 +192,7 @@ export function QuotationListPage() {
             getValue: (q) => (
               <select
                 value={q.status}
+                aria-label={`Status of ${q.docNumberFormatted}`}
                 onChange={(e) => changeStatus(q, e.target.value as DocStatus)}
                 className={`rounded-full border-0 px-2 py-0.5 text-xs font-medium focus:ring-1 focus:ring-ring ${DOC_STATUS_COLORS[q.status]}`}
               >
@@ -140,8 +217,9 @@ export function QuotationListPage() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(q)}
-              className="rounded-md border border-border bg-background p-1.5 hover:bg-accent transition-colors"
-              title="Edit"
+              disabled={q.isIssued}
+              className="rounded-md border border-border bg-background p-1.5 hover:bg-accent transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              title={q.isIssued ? "Issued invoices cannot be edited" : "Edit"}
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -166,6 +244,31 @@ export function QuotationListPage() {
             >
               <MessageCircle className="h-3.5 w-3.5" />
             </button>
+
+            {/* PI → Tax Invoice (point 10) */}
+            {q.docType === "proforma" && (
+              <button
+                onClick={() => convertToInvoice(q)}
+                disabled={convertMutation.isPending}
+                data-testid={`convert-${q.id}`}
+                className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                title="Raise a tax invoice from this proforma"
+              >
+                <ArrowRightCircle className="h-3.5 w-3.5" /> Invoice
+              </button>
+            )}
+
+            {/* Finalise a tax invoice — irreversible, hence the confirm step. */}
+            {q.docType === "invoice" && !q.isIssued && canIssue && (
+              <button
+                onClick={() => setConfirmIssue(q)}
+                data-testid={`issue-${q.id}`}
+                className="flex items-center gap-1 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-400"
+                title="Issue this invoice — it becomes read-only"
+              >
+                <Lock className="h-3.5 w-3.5" /> Issue
+              </button>
+            )}
           </div>
         )}
         renderDialog={({ open, onOpenChange, mode, value, onSuccess }) => (
@@ -179,6 +282,43 @@ export function QuotationListPage() {
           />
         )}
       />
+
+      <QuotationWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        docType={docType}
+        onSuccess={() => setListRefreshKey((k) => k + 1)}
+      />
+
+      {confirmIssue && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+            <h3 className="text-base font-semibold text-foreground">
+              Issue {confirmIssue.docNumberFormatted}?
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Issuing finalises this tax invoice. It cannot be edited or deleted afterwards — a
+              correction then requires a credit note. Check the customer details, line items and
+              totals first.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmIssue(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={issue}
+                disabled={issueMutation.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                Issue Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,8 @@ export type DashboardMetrics = {
   sales: { totalUnits: number; totalValue: number; thisMonthValue: number };
   inventory: { models: number; available: number; sold: number; lowStock: number };
   followUps: { dueToday: number; overdue: number };
+  /** Reminders I own that are due now or overdue. */
+  remindersDue: number;
   totalUsers: number;
   monthlyLeadTrend: MonthlyLeadPoint[];
   leadStatusMix: LeadStatusMixPoint[];

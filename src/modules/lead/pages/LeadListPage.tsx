@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
 import { Pencil, MessageSquare, CheckCircle2, History, FileText, Trash2 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { LeadDialog } from "../components/LeadDialog";
@@ -14,6 +15,7 @@ import {
   LEAD_STATUSES,
   LEAD_SOURCES,
   BULK_DELETABLE_LEAD_STATUSES,
+  LABEL_COLOR_CLASSES,
 } from "../constants/lead.constants";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
@@ -104,11 +106,32 @@ export function LeadListPage() {
         deleteConfirmText="Delete this lead? This removes it from the pipeline (history is retained)."
         columns={[
           {
+            // Point 13 — clicking the lead opens its detail workspace.
             header: "Customer",
             getValue: (l) => (
               <div>
-                <div className="font-medium text-foreground">{l.customerName}</div>
+                <Link
+                  to={`/leads/${l.id}`}
+                  data-testid={`open-lead-${l.id}`}
+                  className="font-medium text-foreground hover:text-primary hover:underline"
+                >
+                  {l.customerName}
+                </Link>
                 <div className="text-xs text-muted-foreground">{l.mobile || "-"}</div>
+                {l.labels?.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {l.labels.map((lb) => (
+                      <span
+                        key={lb.id}
+                        className={`inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+                          LABEL_COLOR_CLASSES[lb.color] ?? LABEL_COLOR_CLASSES.slate
+                        }`}
+                      >
+                        {lb.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             ),
           },

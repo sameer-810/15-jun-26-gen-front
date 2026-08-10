@@ -1,4 +1,19 @@
-import type { DocStatus } from "../types";
+import type { DocStatus, DocType } from "../types";
+
+export const DOC_TYPE_LABELS: Record<DocType, string> = {
+  quotation: "Quotation",
+  proforma: "Proforma Invoice",
+  invoice: "Tax Invoice",
+};
+
+/** Plural forms for tab labels and page headings. */
+export const DOC_TYPE_PLURALS: Record<DocType, string> = {
+  quotation: "Quotations",
+  proforma: "Proforma Invoices",
+  invoice: "Tax Invoices",
+};
+
+export const DOC_TYPES: DocType[] = ["quotation", "proforma", "invoice"];
 
 export const DOC_STATUS_LABELS: Record<DocStatus, string> = {
   draft: "Draft",

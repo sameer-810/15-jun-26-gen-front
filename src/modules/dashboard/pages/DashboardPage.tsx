@@ -12,7 +12,9 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import { Link } from "react-router-dom";
 import { useDashboard } from "../hooks/useDashboard";
+import { RemindersPanel } from "@/modules/lead/components/RemindersPanel";
 import { useAppSelector } from "@/app/hooks";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatCard } from "@/shared/components/StatCard";
@@ -374,7 +376,12 @@ export function DashboardPage() {
               {data?.recentLeads.slice(0, 6).map((l) => (
                 <li key={l.id} className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{l.customerName}</p>
+                    <Link
+                      to={`/leads/${l.id}`}
+                      className="block truncate text-sm font-medium text-foreground hover:text-primary hover:underline"
+                    >
+                      {l.customerName}
+                    </Link>
                     <p className="truncate text-xs text-muted-foreground">
                       {l.assignedToName || "Unassigned"} · {formatDate(l.createdAt)}
                     </p>
@@ -387,6 +394,13 @@ export function DashboardPage() {
             </ul>
           )}
         </ChartCard>
+      </div>
+
+      {/* My reminders — set from the Manage Lead panel, surfaced here. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="lg:col-span-6">
+          <RemindersPanel />
+        </div>
       </div>
 
       {/* Status legend chips */}

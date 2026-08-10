@@ -53,6 +53,8 @@ export type ProductOption = {
   price: number;
   unit?: string;
   primaryImageUrl?: string | null;
+  /** Snapshotted onto the quotation line so the PDF can print the spec block. */
+  specs: ProductSpec[];
   quotationDefaults: QuotationDefaults;
 };
 

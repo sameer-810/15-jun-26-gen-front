@@ -1,17 +1,17 @@
 import { useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
 import { ProductPicker } from "@/modules/product/components/ProductPicker";
 import { quotationSchema, type QuotationFormValues } from "../validations/quotation.validation";
-import { useCreateQuotation, useUpdateQuotation } from "../hooks/useQuotations";
-import { DEFAULT_TERMS } from "../constants/quotation.constants";
+import { useCreateQuotation, useUpdateQuotation, useCustomerLookup } from "../hooks/useQuotations";
+import { DEFAULT_TERMS, DOC_TYPE_LABELS, DOC_TYPES } from "../constants/quotation.constants";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { formatCurrency } from "@/lib/utils";
 import type { ProductOption } from "@/modules/product/types";
-import type { Quotation, QuotationPrefill } from "../types";
+import type { DocType, Quotation, QuotationPrefill } from "../types";
 
 const inputCls =
   "w-full min-w-0 rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
@@ -40,6 +40,10 @@ const blankItem = {
   unitPrice: 0,
   discountPct: 0,
   taxRate: 18,
+  unit: "Piece",
+  product: undefined,
+  imageUrl: "",
+  specs: [],
 };
 
 interface Props {
@@ -47,7 +51,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   mode: "create" | "edit";
   value: Quotation | null;
-  defaultDocType: "quotation" | "proforma";
+  defaultDocType: DocType;
   onSuccess: () => void;
   /** Seed a new document from another record (e.g. "Quote" on a lead row). */
   prefill?: QuotationPrefill | null;
@@ -64,6 +68,7 @@ export function QuotationDialog({
 }: Props) {
   const createMutation = useCreateQuotation();
   const updateMutation = useUpdateQuotation();
+  const lookupMutation = useCustomerLookup();
   const isPending = createMutation.isPending || updateMutation.isPending;
 
   const form = useForm<QuotationFormValues>({
@@ -71,6 +76,7 @@ export function QuotationDialog({
     defaultValues: {
       docType: defaultDocType,
       isInterState: false,
+      shipToSameAsBilling: true,
       items: [{ ...blankItem }],
       termsText: DEFAULT_TERMS.join("\n"),
     },
@@ -91,6 +97,13 @@ export function QuotationDialog({
           customerAddress: value.customerAddress ?? "",
           customerGstin: value.customerGstin ?? "",
           customerState: value.customerState ?? "",
+          shipToSameAsBilling: value.shipToSameAsBilling,
+          shipToName: value.shipToName ?? "",
+          shipToAddress: value.shipToAddress ?? "",
+          shipToGstin: value.shipToGstin ?? "",
+          shipToState: value.shipToState ?? "",
+          shipToContactPerson: value.shipToContactPerson ?? "",
+          shipToMobile: value.shipToMobile ?? "",
           isInterState: value.isInterState,
           items: value.items.map((it) => ({
             description: it.description,
@@ -101,6 +114,10 @@ export function QuotationDialog({
             unitPrice: it.unitPrice,
             discountPct: it.discountPct ?? 0,
             taxRate: it.taxRate ?? 18,
+            unit: it.unit ?? "Piece",
+            product: it.productId ?? undefined,
+            imageUrl: it.imageUrl ?? "",
+            specs: it.specs ?? [],
           })),
           termsText: (value.terms ?? []).join("\n"),
           notes: value.notes ?? "",
@@ -116,6 +133,13 @@ export function QuotationDialog({
           customerAddress: prefill?.customerAddress ?? "",
           customerGstin: "",
           customerState: prefill?.customerState ?? "",
+          shipToSameAsBilling: true,
+          shipToName: "",
+          shipToAddress: "",
+          shipToGstin: "",
+          shipToState: "",
+          shipToContactPerson: "",
+          shipToMobile: "",
           isInterState: false,
           items: [
             {
@@ -171,6 +195,50 @@ export function QuotationDialog({
     form.setValue(`items.${i}.hsnCode`, d.hsnCode, opts);
     form.setValue(`items.${i}.unitPrice`, d.unitPrice, opts);
     form.setValue(`items.${i}.taxRate`, d.taxRate, opts);
+    // Snapshot the catalog identity, image and unit so the PDF can print the
+    // picture and spec block for this line (points 15 & 16).
+    form.setValue(`items.${i}.product`, option.id, opts);
+    form.setValue(`items.${i}.unit`, option.unit ?? "Piece", opts);
+    form.setValue(`items.${i}.imageUrl`, option.primaryImageUrl ?? "", opts);
+    form.setValue(`items.${i}.specs`, option.specs ?? [], opts);
+  }
+
+  /** Pull the last billing/shipping block used for this customer (point 6). */
+  async function autoFetchCustomer() {
+    const mobile = form.getValues("customerMobile");
+    const name = form.getValues("customerName");
+    if (!mobile?.trim() && !name?.trim()) {
+      toast.error("Enter a mobile number or customer name first");
+      return;
+    }
+    try {
+      const found = await lookupMutation.mutateAsync({
+        mobile: mobile?.trim() || undefined,
+        name: name?.trim() || undefined,
+      });
+      if (!found) {
+        toast.error("No earlier document found for this customer");
+        return;
+      }
+      const opts = { shouldDirty: true, shouldValidate: true } as const;
+      form.setValue("customerName", found.customerName, opts);
+      form.setValue("customerMobile", found.customerMobile ?? "", opts);
+      form.setValue("customerEmail", found.customerEmail ?? "", opts);
+      form.setValue("customerAddress", found.customerAddress ?? "", opts);
+      form.setValue("customerGstin", found.customerGstin ?? "", opts);
+      form.setValue("customerState", found.customerState ?? "", opts);
+      form.setValue("isInterState", found.isInterState, opts);
+      form.setValue("shipToSameAsBilling", found.shipToSameAsBilling, opts);
+      form.setValue("shipToName", found.shipToName ?? "", opts);
+      form.setValue("shipToAddress", found.shipToAddress ?? "", opts);
+      form.setValue("shipToGstin", found.shipToGstin ?? "", opts);
+      form.setValue("shipToState", found.shipToState ?? "", opts);
+      form.setValue("shipToContactPerson", found.shipToContactPerson ?? "", opts);
+      form.setValue("shipToMobile", found.shipToMobile ?? "", opts);
+      toast.success(`Filled from ${found.sourceDocNumber}`);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
   }
 
   async function onSubmit(data: QuotationFormValues) {
@@ -189,6 +257,19 @@ export function QuotationDialog({
         customerAddress: data.customerAddress || undefined,
         customerGstin: data.customerGstin || undefined,
         customerState: data.customerState || undefined,
+        shipToSameAsBilling: data.shipToSameAsBilling,
+        // Only send the ship-to block when it is actually in use, so a
+        // "same as billing" document doesn't carry stale text.
+        ...(data.shipToSameAsBilling
+          ? {}
+          : {
+              shipToName: data.shipToName || undefined,
+              shipToAddress: data.shipToAddress || undefined,
+              shipToGstin: data.shipToGstin || undefined,
+              shipToState: data.shipToState || undefined,
+              shipToContactPerson: data.shipToContactPerson || undefined,
+              shipToMobile: data.shipToMobile || undefined,
+            }),
         isInterState: data.isInterState,
         items: data.items.map((it) => ({
           description: it.description,
@@ -199,6 +280,10 @@ export function QuotationDialog({
           unitPrice: Number(it.unitPrice),
           discountPct: Number(it.discountPct) || 0,
           taxRate: Number(it.taxRate),
+          unit: it.unit || undefined,
+          product: it.product || undefined,
+          imageUrl: it.imageUrl || undefined,
+          specs: it.specs?.length ? it.specs : undefined,
         })),
         terms,
         notes: data.notes || undefined,
@@ -217,6 +302,7 @@ export function QuotationDialog({
   }
 
   const docType = form.watch("docType");
+  const shipToSameAsBilling = form.watch("shipToSameAsBilling");
 
   return (
     <FormDialog
@@ -233,9 +319,17 @@ export function QuotationDialog({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-            <select className={inputCls} {...form.register("docType")} disabled={mode === "edit"}>
-              <option value="quotation">Quotation</option>
-              <option value="proforma">Proforma Invoice</option>
+            <select
+              className={inputCls}
+              {...form.register("docType")}
+              disabled={mode === "edit"}
+              aria-label="Document type"
+            >
+              {DOC_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {DOC_TYPE_LABELS[t]}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -260,9 +354,23 @@ export function QuotationDialog({
           </label>
         </div>
 
-        {/* Customer */}
+        {/* Bill To */}
         <div className="rounded-lg border border-border p-3">
-          <div className="text-xs font-semibold text-muted-foreground mb-2">CUSTOMER</div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="text-xs font-semibold text-muted-foreground">BILL TO</div>
+            {/* Point 6 "auto fetch" — pull this customer's last billing and
+                shipping block instead of re-keying a repeat order. */}
+            <button
+              type="button"
+              onClick={autoFetchCustomer}
+              disabled={lookupMutation.isPending}
+              data-testid="auto-fetch-customer"
+              className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3 w-3 ${lookupMutation.isPending ? "animate-spin" : ""}`} />
+              Auto-fetch from last document
+            </button>
+          </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="sm:col-span-1">
               <input
@@ -284,6 +392,60 @@ export function QuotationDialog({
               {...form.register("customerAddress")}
             />
           </div>
+        </div>
+
+        {/* Ship To — the R4 sample invoice splits delivery from billing. */}
+        <div className="rounded-lg border border-border p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-semibold text-muted-foreground">SHIP TO</div>
+            <label className="flex items-center gap-2 text-sm text-foreground">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                data-testid="ship-to-same"
+                {...form.register("shipToSameAsBilling")}
+              />
+              Same as billing
+            </label>
+          </div>
+          {shipToSameAsBilling ? (
+            <p className="text-xs text-muted-foreground">
+              The document will repeat the Bill To block as the delivery address.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <input
+                className={inputCls}
+                placeholder="Ship-to name"
+                {...form.register("shipToName")}
+              />
+              <input
+                className={inputCls}
+                placeholder="Contact person"
+                {...form.register("shipToContactPerson")}
+              />
+              <input
+                className={inputCls}
+                placeholder="Contact mobile"
+                {...form.register("shipToMobile")}
+              />
+              <input
+                className={inputCls}
+                placeholder="Ship-to GSTIN"
+                {...form.register("shipToGstin")}
+              />
+              <input
+                className={inputCls}
+                placeholder="Ship-to state"
+                {...form.register("shipToState")}
+              />
+              <input
+                className={inputCls}
+                placeholder="Delivery address"
+                {...form.register("shipToAddress")}
+              />
+            </div>
+          )}
         </div>
 
         {/* Line items */}

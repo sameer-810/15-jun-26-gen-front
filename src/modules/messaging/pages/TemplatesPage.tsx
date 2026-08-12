@@ -229,6 +229,7 @@ export function TemplatesPage() {
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => openEditor(t)}
+                    data-testid={`edit-template-${t.id}`}
                     className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
                   >
                     <Pencil className="h-3 w-3" /> Edit
@@ -329,6 +330,7 @@ export function TemplatesPage() {
                 <button
                   type="button"
                   onClick={() => setPickerOpen(true)}
+                  data-testid="pick-template-image"
                   className="flex items-center gap-1 rounded-lg border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent"
                 >
                   <ImagePlus className="h-3 w-3" /> Choose image

@@ -77,6 +77,7 @@ export function SendMessageDialog({
     leadDocs?.items.find((d) => d.id === pickedDocId)?.docNumberFormatted ||
     undefined;
 
+  const templateImageUrl = templates?.items.find((t) => t.id === templateId)?.imageUrl || null;
   const cap = channel === "whatsapp" ? caps?.whatsapp : caps?.email;
   const isWhatsApp = channel === "whatsapp";
 
@@ -116,8 +117,10 @@ export function SendMessageDialog({
         leadId,
         channel,
         to: recipient.trim() || undefined,
-        // Sending the edited body rather than the template id, so any tweak
-        // the user made in the box is what actually goes out.
+        // Both: the edited body is what goes out (the server prefers it), and
+        // the template id carries its image along — an IndiaMART-style
+        // "template with image and full description".
+        templateId: templateId || undefined,
         body: body.trim() || undefined,
         subject: channel === "email" ? subject.trim() || undefined : undefined,
         documentId: attachedId,
@@ -255,6 +258,22 @@ export function SendMessageDialog({
             when the message is sent.
           </p>
         </div>
+
+        {templateImageUrl && (
+          <div className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm">
+            <img
+              src={templateImageUrl}
+              alt="Template image"
+              data-testid="template-image-preview"
+              className="h-12 w-12 shrink-0 rounded border border-border object-cover"
+            />
+            <span className="text-xs text-muted-foreground">
+              {isWhatsApp
+                ? "This picture is sent ahead of the message."
+                : "This picture is included with the email."}
+            </span>
+          </div>
+        )}
 
         {offerDocuments && (
           <div>

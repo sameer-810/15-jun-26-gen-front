@@ -42,6 +42,8 @@ export function InventoryListPage() {
   const [location, setLocation] = useState("");
   const [minQty, setMinQty] = useState("");
   const [maxQty, setMaxQty] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [stockItem, setStockItem] = useState<Inventory | null>(null);
   const [stockOpen, setStockOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -158,6 +160,8 @@ export function InventoryListPage() {
           location: location.trim() || undefined,
           minQuantity: toQty(minQty),
           maxQuantity: toQty(maxQty),
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
           page,
           limit,
         })}
@@ -211,6 +215,31 @@ export function InventoryListPage() {
                   onChange={(e) => setMaxQty(e.target.value)}
                   placeholder="Max"
                   className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                />
+              </div>
+            </div>
+            {/* Same date window as Leads and Sales — point 9. */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Added between
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  aria-label="Added from"
+                  data-testid="inventory-start-date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`${filterInputCls} w-[140px]`}
+                />
+                <span className="text-muted-foreground">–</span>
+                <input
+                  type="date"
+                  aria-label="Added to"
+                  data-testid="inventory-end-date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`${filterInputCls} w-[140px]`}
                 />
               </div>
             </div>

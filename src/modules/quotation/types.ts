@@ -85,6 +85,8 @@ export type QuotationListQuery = {
   search?: string;
   docType?: DocType;
   status?: DocStatus;
+  /** Restrict to documents raised for one lead. */
+  lead?: string;
   page: number;
   limit: number;
 };

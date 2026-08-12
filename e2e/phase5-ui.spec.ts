@@ -327,3 +327,113 @@ test.describe("Point 4 — calculate first, then create the quotation", () => {
     await expect(dialog.locator("input[name='items.0.unitPrice']")).toHaveValue("940000");
   });
 });
+
+test.describe("Second pass — the same three gaps, in the browser", () => {
+  test("point 9: Inventory and Sales show a date window like Leads", async ({ page }) => {
+    const inv = (
+      await (
+        await ctx.post(`${API}/inventory`, {
+          data: { model: `${RUN_TAG}-UIWindow`, brand: "Mahindra", kva: 15, availableQuantity: 3 },
+        })
+      ).json()
+    ).data;
+    track("inventory", inv.id);
+
+    await page.goto("/inventory");
+    await waitForTable(page);
+    await page.getByPlaceholder("Model or brand...").fill(`${RUN_TAG}-UIWindow`);
+    await waitForTable(page);
+    await expect(page.locator("tbody tr", { hasText: `${RUN_TAG}-UIWindow` })).toHaveCount(1);
+
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    await page.getByTestId("inventory-end-date").fill(yesterday);
+    await waitForTable(page);
+    await expect(page.locator("tbody tr", { hasText: `${RUN_TAG}-UIWindow` })).toHaveCount(0);
+
+    await page.goto("/sales");
+    await expect(page.getByRole("heading", { name: "Sales" })).toBeVisible();
+    await expect(page.getByTestId("sale-start-date")).toBeVisible();
+    await expect(page.getByTestId("sale-end-date")).toBeVisible();
+  });
+
+  test("point 4: Import from Inventory fills the quotation description dropdown", async ({
+    page,
+  }) => {
+    const inv = (
+      await (
+        await ctx.post(`${API}/inventory`, {
+          data: {
+            model: `${RUN_TAG}-UISEED`,
+            brand: `${RUN_TAG}Make`,
+            kva: 82.5,
+            sellingPrice: 610000,
+            availableQuantity: 1,
+          },
+        })
+      ).json()
+    ).data;
+    track("inventory", inv.id);
+
+    await page.goto("/catalog");
+    await waitForTable(page);
+    await page.getByTestId("seed-from-inventory").click();
+
+    // Wait for the catalog to actually gain the stocked model, rather than for
+    // a toast that could be confused with the button's own label.
+    let seeded: { id: string; kva?: number } | undefined;
+    await expect
+      .poll(
+        async () => {
+          const listed = await ctx.get(`${API}/products?search=${RUN_TAG}&limit=10`);
+          seeded = ((await listed.json()).data as Array<{ id: string; kva?: number }>).find(
+            (p) => p.kva === 82.5,
+          );
+          return Boolean(seeded);
+        },
+        { message: "the stocked model should reach the catalog" },
+      )
+      .toBe(true);
+    track("products", seeded!.id);
+
+    // And it is now offered by the quotation's description picker.
+    await page.goto("/quotations");
+    await waitForTable(page);
+    await page.getByRole("button", { name: /New Quotation/ }).click();
+    await page.getByTestId("product-picker-0").click();
+    await page.getByPlaceholder("Search the catalog...").fill(`${RUN_TAG}Make`);
+    await page.getByTestId(`product-option-${seeded!.id}`).click();
+    await expect(page.locator("#item-description-0")).toHaveValue(/82.5 kVA/);
+    await expect(page.locator("input[name='items.0.unitPrice']")).toHaveValue("610000");
+  });
+
+  test("point 1: the lead's own quotation can be attached when sending", async ({ page }) => {
+    const lead = await createLead(ctx, { customerName: `${RUN_TAG} AttachDoc` });
+    track("leads", lead.id);
+    const doc = (
+      await (
+        await ctx.post(`${API}/quotations`, {
+          data: {
+            docType: "quotation",
+            lead: lead.id,
+            customerName: `${RUN_TAG} AttachDoc`,
+            customerMobile: "9876500001",
+            items: [{ description: "40 kVA genset", quantity: 1, unitPrice: 420000, taxRate: 18 }],
+          },
+        })
+      ).json()
+    ).data;
+    track("quotations", doc.id);
+
+    await page.goto(`/leads/${lead.id}`);
+    await expect(page.getByTestId("lead-detail")).toBeVisible();
+    await page.getByTestId("detail-whatsapp").click();
+
+    const picker = page.getByTestId("send-document-picker");
+    await expect(picker).toBeVisible();
+    await picker.selectOption(doc.id);
+
+    const dialog = page.getByTestId("send-message");
+    await expect(dialog).toContainText(doc.docNumberFormatted);
+    await expect(dialog).toContainText(/attached as a PDF|secure link/);
+  });
+});

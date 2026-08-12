@@ -403,3 +403,139 @@ test.describe("Point 4 — sizing feeds the quotation", () => {
     expect(result.surgeContributor).toBeTruthy();
   });
 });
+
+test.describe("Second pass — gaps found re-reading the 11-August list", () => {
+  test("point 9: Inventory and Sales accept the same date window as Leads", async () => {
+    const inv = (
+      await (
+        await ctx.post(`${API}/inventory`, {
+          data: {
+            model: `${RUN_TAG}-DateFilter`,
+            brand: "Mahindra",
+            kva: 25,
+            availableQuantity: 1,
+          },
+        })
+      ).json()
+    ).data;
+    track("inventory", inv.id);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+    // Search on the unique model, so other fixtures in this run cannot inflate it.
+    const q = `${RUN_TAG}-DateFilter`;
+    const inWindow = await ctx.get(`${API}/inventory?search=${q}&startDate=${today}`);
+    expect(((await inWindow.json()).data as unknown[]).length).toBe(1);
+    const outOfWindow = await ctx.get(`${API}/inventory?search=${q}&endDate=${yesterday}`);
+    expect(((await outOfWindow.json()).data as unknown[]).length).toBe(0);
+
+    // Sales take the window on saleDate.
+    const sale = await ctx.get(`${API}/sales?startDate=${today}&endDate=${today}`);
+    expect(sale.status()).toBe(200);
+  });
+
+  test("point 4: the catalog can be seeded from the models already in Inventory", async () => {
+    const inv = (
+      await (
+        await ctx.post(`${API}/inventory`, {
+          data: {
+            model: `${RUN_TAG}-SEED-1`,
+            brand: `${RUN_TAG}Brand`,
+            kva: 62.5,
+            fuelType: "diesel",
+            phase: "three",
+            sellingPrice: 555000,
+            availableQuantity: 2,
+          },
+        })
+      ).json()
+    ).data;
+    track("inventory", inv.id);
+
+    const first = await ctx.post(`${API}/products/seed-from-inventory`);
+    expect(first.status(), await first.text()).toBe(200);
+    expect((await first.json()).data.created).toBeGreaterThanOrEqual(1);
+
+    const listed = await ctx.get(`${API}/products?search=${RUN_TAG}&limit=10`);
+    const items = (await listed.json()).data as Array<{
+      id: string;
+      price: number;
+      kva?: number;
+      quotationDefaults: { description: string; unitPrice: number };
+    }>;
+    const seeded = items.find((p) => p.kva === 62.5);
+    expect(seeded, "the stocked model should now be in the catalog").toBeTruthy();
+    track("products", seeded!.id);
+    // The price and description come across ready to drop into a quotation.
+    expect(seeded!.quotationDefaults.unitPrice).toBe(555000);
+    expect(seeded!.quotationDefaults.description).toContain("62.5 kVA");
+
+    // Running it again must not duplicate what is already there.
+    const second = await ctx.post(`${API}/products/seed-from-inventory`);
+    const secondBody = (await second.json()).data;
+    expect(secondBody.created).toBe(0);
+    expect(secondBody.skipped).toBeGreaterThanOrEqual(1);
+  });
+
+  test("point 1: a lead's own documents can be listed for sending", async () => {
+    const lead = await createLead(ctx, { customerName: `${RUN_TAG} DocsOfLead` });
+    track("leads", lead.id);
+
+    const doc = (
+      await (
+        await ctx.post(`${API}/quotations`, {
+          data: {
+            docType: "quotation",
+            lead: lead.id,
+            customerName: `${RUN_TAG} DocsOfLead`,
+            customerMobile: "9876500001",
+            items: [{ description: "25 kVA genset", quantity: 1, unitPrice: 300000, taxRate: 18 }],
+          },
+        })
+      ).json()
+    ).data;
+    track("quotations", doc.id);
+
+    const mine = await ctx.get(`${API}/quotations?lead=${lead.id}&limit=10`);
+    const docs = (await mine.json()).data as Array<{ id: string }>;
+    expect(docs).toHaveLength(1);
+    expect(docs[0].id).toBe(doc.id);
+
+    // And that document can be sent to the lead's own number.
+    const sent = await ctx.post(`${API}/messages`, {
+      data: {
+        leadId: lead.id,
+        channel: "whatsapp",
+        body: "Sharing the quotation.",
+        documentId: doc.id,
+      },
+    });
+    expect(sent.status(), await sent.text()).toBe(201);
+    const msg = (await sent.json()).data;
+    expect(msg.documentUrl).toBeTruthy();
+    expect(msg.toAddress).toBe("9876500001");
+  });
+});
+
+test.describe("Second pass — a deleted lead takes its conversation with it", () => {
+  test("messages are cascaded, not orphaned", async () => {
+    const lead = await createLead(ctx, { customerName: `${RUN_TAG} CascadeMsg` });
+
+    const sent = await ctx.post(`${API}/messages`, {
+      data: { leadId: lead.id, channel: "whatsapp", body: `${RUN_TAG} cascade check` },
+    });
+    expect(sent.status()).toBe(201);
+    expect(
+      ((await (await ctx.get(`${API}/messages/lead/${lead.id}`)).json()).data as unknown[]).length,
+    ).toBe(1);
+
+    await ctx.delete(`${API}/leads/${lead.id}`);
+
+    // The thread goes with the lead, the way its reminders already do: the
+    // conversation is unreachable, and the rows are soft-deleted rather than
+    // left pointing at a lead that no longer exists.
+    const after = await ctx.get(`${API}/messages/lead/${lead.id}`);
+    expect(after.status()).toBe(404);
+  });
+});

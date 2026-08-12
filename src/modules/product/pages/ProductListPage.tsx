@@ -1,10 +1,10 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Pencil, Trash2, Download, Upload, ImageOff } from "lucide-react";
+import { Pencil, Trash2, Download, Upload, ImageOff, PackagePlus } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { ProductDialog } from "../components/ProductDialog";
 import { useProducts, useDeleteProduct, useProductFacets } from "../hooks/useProducts";
-import { importProducts, productExportPath } from "../api/productApi";
+import { importProducts, productExportPath, seedCatalogFromInventory } from "../api/productApi";
 import { downloadAuthenticatedFile } from "@/shared/lib/downloadFile";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
@@ -48,6 +48,22 @@ export function ProductListPage() {
     }
   }
 
+  async function onSeedFromInventory() {
+    try {
+      const result = await seedCatalogFromInventory();
+      qc.invalidateQueries({ queryKey: ["products"] });
+      toast.success(
+        result.created
+          ? `Added ${result.created} product(s) from Inventory${
+              result.skipped ? `, ${result.skipped} already in the catalog` : ""
+            }`
+          : "Every stocked model is already in the catalog",
+      );
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
+
   async function onFileChosen(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -82,6 +98,14 @@ export function ProductListPage() {
             onChange={onFileChosen}
             className="hidden"
           />
+          <button
+            onClick={onSeedFromInventory}
+            data-testid="seed-from-inventory"
+            title="Create catalog entries for the models already in Inventory"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            <PackagePlus className="h-4 w-4" /> Import from Inventory
+          </button>
           <button
             onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"

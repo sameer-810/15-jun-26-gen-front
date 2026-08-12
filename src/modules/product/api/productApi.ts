@@ -47,4 +47,15 @@ export async function importProducts(fileBase64: string) {
   return res.data.data;
 }
 
+/**
+ * Copy the models already held in Inventory into the catalog, so the quotation
+ * description dropdown is useful without re-typing the stock list (point 4).
+ */
+export async function seedCatalogFromInventory() {
+  const res = await http.post<{
+    data: { found: number; created: number; skipped: number };
+  }>("/products/seed-from-inventory");
+  return res.data.data;
+}
+
 export const productExportPath = "/products/export";

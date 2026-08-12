@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MessageCircle, Mail, Paperclip, Info, ExternalLink } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
 import { useMessagingCapabilities, useSendMessage, useTemplates } from "../hooks/useMessaging";
+import { useQuotations } from "@/modules/quotation/hooks/useQuotations";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import type { MessageChannel } from "../types";
@@ -31,7 +32,13 @@ interface Props {
   leadId?: string;
   /** Pre-filled recipient; falls back to the lead's mobile/email. */
   to?: string;
-  /** Document to share. Sent as an attachment or a public link. */
+  /**
+   * Document to share, when the caller already knows which one (e.g. sending
+   * from a quotation row). Sent as an attachment or a public link.
+   * Left unset when sending from a lead — the dialog then offers that lead's
+   * own documents to attach, which is point 1's "generate a quotation and send
+   * it to the same lead phone number".
+   */
   documentId?: string;
   documentLabel?: string;
   onSent?: () => void;
@@ -55,6 +62,20 @@ export function SendMessageDialog({
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [pickedDocId, setPickedDocId] = useState("");
+
+  // Only when the caller did not fix a document: this lead's own quotations,
+  // proformas and invoices, newest first.
+  const offerDocuments = Boolean(leadId) && !documentId;
+  const { data: leadDocs } = useQuotations(
+    { lead: leadId, page: 1, limit: 20 },
+    { enabled: offerDocuments && open },
+  );
+  const attachedId = documentId || pickedDocId || undefined;
+  const attachedLabel =
+    documentLabel ||
+    leadDocs?.items.find((d) => d.id === pickedDocId)?.docNumberFormatted ||
+    undefined;
 
   const cap = channel === "whatsapp" ? caps?.whatsapp : caps?.email;
   const isWhatsApp = channel === "whatsapp";
@@ -65,6 +86,7 @@ export function SendMessageDialog({
     setTemplateId("");
     setSubject("");
     setBody("");
+    setPickedDocId("");
   }, [open, to]);
 
   // Picking a template loads its text so it can be edited before sending.
@@ -98,7 +120,7 @@ export function SendMessageDialog({
         // the user made in the box is what actually goes out.
         body: body.trim() || undefined,
         subject: channel === "email" ? subject.trim() || undefined : undefined,
-        documentId,
+        documentId: attachedId,
       });
 
       if (message.handoffUrl) {
@@ -140,14 +162,14 @@ export function SendMessageDialog({
             {cap?.configured ? (
               <>
                 Sent directly from the CRM
-                {documentId ? " with the PDF attached" : ""}.
+                {attachedId ? " with the PDF attached" : ""}.
               </>
             ) : (
               <>
                 {isWhatsApp ? "WhatsApp" : "Email"} is not connected yet, so the CRM will prepare
                 this message and open {isWhatsApp ? "WhatsApp" : "your mail client"} for you to
                 press send.
-                {documentId ? (
+                {attachedId ? (
                   <> The PDF travels as a secure link the customer can tap to open it.</>
                 ) : null}
               </>
@@ -234,11 +256,41 @@ export function SendMessageDialog({
           </p>
         </div>
 
-        {documentId && (
+        {offerDocuments && (
+          <div>
+            <label
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+              htmlFor="send-document"
+            >
+              Attach a document
+            </label>
+            <select
+              id="send-document"
+              data-testid="send-document-picker"
+              className={inputCls}
+              value={pickedDocId}
+              onChange={(e) => setPickedDocId(e.target.value)}
+            >
+              <option value="">— No document —</option>
+              {leadDocs?.items.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.docNumberFormatted} · {d.customerName}
+                </option>
+              ))}
+            </select>
+            {!leadDocs?.items.length && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                No quotation raised for this lead yet — use Quote on the lead first.
+              </p>
+            )}
+          </div>
+        )}
+
+        {attachedId && (
           <div className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm">
             <Paperclip className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">
-              {documentLabel || "Document"}
+              {attachedLabel || "Document"}
               <span className="ml-2 text-xs text-muted-foreground">
                 {cap?.canAttach
                   ? "attached as a PDF"

@@ -34,6 +34,9 @@ export type InventoryListQuery = {
   /** Bounds on units currently available. */
   minQuantity?: number;
   maxQuantity?: number;
+  /** Added-on window (inclusive IST days). */
+  startDate?: string;
+  endDate?: string;
   page: number;
   limit: number;
 };

@@ -19,8 +19,13 @@ export function createResourceHooks<
     list: (filters: TListQuery) => [...KEYS.lists(), filters] as const,
   };
 
-  function useList(query: TListQuery) {
-    return useQuery({ queryKey: KEYS.list(query), queryFn: () => api.list(query) });
+  /** `enabled: false` holds the request back until the caller has what it needs. */
+  function useList(query: TListQuery, options?: { enabled?: boolean }) {
+    return useQuery({
+      queryKey: KEYS.list(query),
+      queryFn: () => api.list(query),
+      enabled: options?.enabled ?? true,
+    });
   }
 
   function useCreate() {

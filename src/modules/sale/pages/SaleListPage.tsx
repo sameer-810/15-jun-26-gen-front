@@ -27,6 +27,8 @@ export function SaleListPage() {
   const [location, setLocation] = useState("");
   const [minQty, setMinQty] = useState("");
   const [maxQty, setMaxQty] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
@@ -35,6 +37,8 @@ export function SaleListPage() {
     location: location.trim() || undefined,
     minQuantity: toQty(minQty),
     maxQuantity: toQty(maxQty),
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
     page,
     limit: 50,
   });
@@ -147,6 +151,37 @@ export function SaleListPage() {
               }}
               placeholder="Max"
               className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+            />
+          </div>
+        </div>
+        {/* Same date window as Leads — point 9 asks for it on every screen. */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">
+            Sold between
+          </label>
+          <div className="flex items-center gap-1">
+            <input
+              type="date"
+              aria-label="Sold from"
+              data-testid="sale-start-date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1);
+              }}
+              className={`${filterInputCls} w-[140px]`}
+            />
+            <span className="text-muted-foreground">–</span>
+            <input
+              type="date"
+              aria-label="Sold to"
+              data-testid="sale-end-date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className={`${filterInputCls} w-[140px]`}
             />
           </div>
         </div>

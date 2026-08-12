@@ -56,3 +56,9 @@ export async function convertLead(id: string, payload: ConvertLeadPayload) {
   );
   return res.data.data;
 }
+
+/** Cities present on leads, most common first — feeds the Location filter. */
+export async function getLeadCityFacets(): Promise<{ city: string; count: number }[]> {
+  const res = await http.get<{ data: { city: string; count: number }[] }>("/leads/facets/cities");
+  return res.data.data;
+}

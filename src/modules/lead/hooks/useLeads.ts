@@ -9,6 +9,7 @@ import {
   addFollowUp,
   getDueFollowUps,
   getAssignableUsers,
+  getLeadCityFacets,
   convertLead,
   type ConvertLeadPayload,
 } from "../api/leadApi";
@@ -71,6 +72,14 @@ export function useConvertLead() {
       qc.invalidateQueries({ queryKey: ["inventory"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
     },
+  });
+}
+
+export function useLeadCities() {
+  return useQuery({
+    queryKey: ["leads", "facets", "cities"],
+    queryFn: getLeadCityFacets,
+    staleTime: 60_000,
   });
 }
 

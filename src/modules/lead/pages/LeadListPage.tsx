@@ -19,6 +19,7 @@ import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
 import { LeadTimelineDialog } from "@/modules/activity/components/LeadTimelineDialog";
 import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog";
 import { LeadImportDialog } from "../components/LeadImportDialog";
+import { LeadCitySelect } from "../components/LeadCitySelect";
 import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
 import { useLogCall } from "../hooks/useLeadWorkspace";
 import type { MessageChannel } from "@/modules/messaging/types";
@@ -282,11 +283,11 @@ export function LeadListPage() {
               >
                 Location
               </label>
-              <input
+              <LeadCitySelect
                 id="lead-location-filter"
+                data-testid="lead-location-filter"
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="City..."
+                onChange={setLocation}
                 className={filterInputCls}
               />
             </div>

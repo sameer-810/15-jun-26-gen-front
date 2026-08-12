@@ -24,6 +24,17 @@ export async function searchProductOptions(search: string, limit = 20): Promise<
   return res.data.data;
 }
 
+/**
+ * Catalog gensets rated at or above a calculated load, smallest first — the
+ * calculator's hand-off to a quotation (point 4, "first calculate then quote").
+ */
+export async function suggestGensets(minKva: number, limit = 4): Promise<ProductOption[]> {
+  const res = await http.get<{ data: ProductOption[] }>("/products/options", {
+    params: { minKva, limit },
+  });
+  return res.data.data;
+}
+
 export async function getProductFacets(): Promise<ProductFacets> {
   const res = await http.get<{ data: ProductFacets }>("/products/facets");
   return res.data.data;

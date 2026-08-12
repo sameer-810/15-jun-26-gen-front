@@ -38,6 +38,9 @@ export function FormDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={cn(
           "w-full rounded-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
           sizeMap[size],

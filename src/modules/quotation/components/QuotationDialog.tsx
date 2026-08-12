@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2, RefreshCw } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
 import { ProductPicker } from "@/modules/product/components/ProductPicker";
+import { useTemplates } from "@/modules/messaging/hooks/useMessaging";
 import { quotationSchema, type QuotationFormValues } from "../validations/quotation.validation";
 import { useCreateQuotation, useUpdateQuotation, useCustomerLookup } from "../hooks/useQuotations";
 import { DEFAULT_TERMS, DOC_TYPE_LABELS, DOC_TYPES } from "../constants/quotation.constants";
@@ -303,6 +304,12 @@ export function QuotationDialog({
 
   const docType = form.watch("docType");
   const shipToSameAsBilling = form.watch("shipToSameAsBilling");
+  // Point 4 — a Terms & Conditions preset, the counterpart to the catalog
+  // picker on the description.
+  const { data: termsTemplates } = useTemplates(
+    { kind: "terms", activeOnly: true, limit: 50 },
+    open,
+  );
 
   return (
     <FormDialog
@@ -591,10 +598,44 @@ export function QuotationDialog({
         {/* Terms + notes */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Terms &amp; Conditions (one per line)
-            </label>
-            <textarea className={inputCls} rows={4} {...form.register("termsText")} />
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              <label
+                className="block text-xs font-medium text-muted-foreground"
+                htmlFor="terms-text"
+              >
+                Terms &amp; Conditions (one per line)
+              </label>
+              {termsTemplates?.items.length ? (
+                <select
+                  aria-label="Terms template"
+                  data-testid="terms-template-picker"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const t = termsTemplates.items.find((x) => x.id === e.target.value);
+                    if (t) {
+                      form.setValue("termsText", t.body, { shouldDirty: true });
+                      toast.success(`Terms set from "${t.name}"`);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Use a template…</option>
+                  {termsTemplates.items.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.isDefault ? " (default)" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+            <textarea
+              id="terms-text"
+              className={inputCls}
+              rows={4}
+              {...form.register("termsText")}
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Notes</label>

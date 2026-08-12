@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FormDialog } from "@/modules/common/FormDialog";
+import { LocationSelect } from "@/modules/location/LocationSelect";
 import { inventorySchema, type InventoryFormValues } from "../validations/inventory.validation";
 import { useCreateInventory, useUpdateInventory } from "../hooks/useInventory";
 import { FUEL_TYPES, PHASES, FUEL_LABELS, PHASE_LABELS } from "../constants/inventory.constants";
@@ -17,16 +18,19 @@ function Field({
   error,
   children,
   span2,
+  hint,
 }: {
   label: string;
   error?: string;
   children: React.ReactNode;
   span2?: boolean;
+  hint?: string;
 }) {
   return (
     <div className={span2 ? "sm:col-span-2" : undefined}>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       {children}
+      {hint && !error && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
@@ -153,11 +157,17 @@ export function InventoryDialog({ open, onOpenChange, mode, value, onSuccess }: 
             ))}
           </select>
         </Field>
-        <Field label="Location" error={errors.location?.message}>
-          <input
+        <Field
+          label="Location"
+          error={errors.location?.message}
+          hint="Managed under Administration → Locations."
+        >
+          {/* Point 9 — a dropdown from the master list, not free text. */}
+          <LocationSelect
+            data-testid="inventory-location"
+            value={form.watch("location") ?? ""}
+            onChange={(v) => form.setValue("location", v, { shouldDirty: true })}
             className={inputCls}
-            placeholder="Branch / godown, e.g. Mumbai Yard"
-            {...form.register("location")}
           />
         </Field>
         {mode === "create" && (

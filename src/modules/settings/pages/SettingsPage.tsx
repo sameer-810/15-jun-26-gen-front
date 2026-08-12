@@ -1,6 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Building2, Save } from "lucide-react";
+import { Building2, Save, ImagePlus, X } from "lucide-react";
+import { MediaPickerDialog } from "@/modules/media/components/MediaPickerDialog";
+import type { Media } from "@/modules/media/types";
 import { useBusinessProfile, useUpdateBusinessProfile } from "../hooks/useSettings";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
@@ -25,6 +27,7 @@ type FormValues = {
   bankName: string;
   bankAccountNumber: string;
   bankIfsc: string;
+  closingLines: string;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -36,8 +39,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+type ArtKey = "letterheadHeaderUrl" | "letterheadFooterUrl" | "signatureUrl";
+
 export function SettingsPage() {
   const { data, isLoading } = useBusinessProfile();
+  const [art, setArt] = useState<Record<ArtKey, string>>({
+    letterheadHeaderUrl: "",
+    letterheadFooterUrl: "",
+    signatureUrl: "",
+  });
+  const [pickerFor, setPickerFor] = useState<ArtKey | null>(null);
   const updateMutation = useUpdateBusinessProfile();
   const form = useForm<FormValues>();
 
@@ -59,6 +70,13 @@ export function SettingsPage() {
         bankName: data.bankName ?? "",
         bankAccountNumber: data.bankAccountNumber ?? "",
         bankIfsc: data.bankIfsc ?? "",
+        closingLines: (data.closingLines ?? []).join("\n"),
+      });
+      // Letterhead artwork is picked, not typed, so it lives outside the form.
+      setArt({
+        letterheadHeaderUrl: data.letterheadHeaderUrl ?? "",
+        letterheadFooterUrl: data.letterheadFooterUrl ?? "",
+        signatureUrl: data.signatureUrl ?? "",
       });
     }
   }, [data, form]);
@@ -76,6 +94,11 @@ export function SettingsPage() {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
+        closingLines: (values.closingLines || "")
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        ...art,
       });
       toast.success("Business profile updated");
     } catch (err) {
@@ -186,6 +209,69 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* Point 6 — the client's own letterhead on generated PDFs. */}
+        <section className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              Letterhead (PDF header & footer)
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Used on quotations, proforma invoices and tax invoices. Leave blank to keep the
+              typeset header.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {(
+              [
+                ["letterheadHeaderUrl", "Header artwork", "header"],
+                ["letterheadFooterUrl", "Footer artwork", "footer"],
+                ["signatureUrl", "Signature / stamp", "signature"],
+              ] as const
+            ).map(([key, label, testId]) => (
+              <Field key={key} label={label}>
+                {art[key] ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={art[key]}
+                      alt={label}
+                      className="h-24 w-full rounded-lg border border-border bg-white object-contain p-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setArt((a) => ({ ...a, [key]: "" }))}
+                      aria-label={`Remove ${label}`}
+                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white hover:bg-black/80"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPickerFor(key)}
+                    data-testid={`pick-${testId}`}
+                    className="flex h-24 w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:bg-accent"
+                  >
+                    <ImagePlus className="h-4 w-4" /> Choose image
+                  </button>
+                )}
+              </Field>
+            ))}
+          </div>
+          <Field label="Closing lines (one per line, printed above the footer artwork)">
+            <textarea
+              rows={3}
+              className={inputCls}
+              placeholder={"Thanking you,\nSales Team HOD,\nFor SAJID MANSURI"}
+              {...form.register("closingLines")}
+            />
+          </Field>
+          <p className="text-[11px] text-muted-foreground">
+            Leave the closing lines blank if the footer artwork already carries the sign-off, or it
+            prints twice.
+          </p>
+        </section>
+
         <div className="flex justify-end">
           <button
             type="submit"
@@ -197,6 +283,17 @@ export function SettingsPage() {
           </button>
         </div>
       </form>
+
+      <MediaPickerDialog
+        open={Boolean(pickerFor)}
+        onOpenChange={(open) => !open && setPickerFor(null)}
+        multiple={false}
+        restrictKind="image"
+        title="Choose letterhead artwork"
+        onSelect={(files: Media[]) => {
+          if (pickerFor && files[0]) setArt((a) => ({ ...a, [pickerFor]: files[0].url }));
+        }}
+      />
     </div>
   );
 }

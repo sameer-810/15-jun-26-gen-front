@@ -7,10 +7,13 @@ import {
   Lock,
   ArrowRightCircle,
   Wand2,
+  Mail,
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { QuotationDialog } from "../components/QuotationDialog";
 import { QuotationWizard } from "../components/QuotationWizard";
+import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
+import type { MessageChannel } from "@/modules/messaging/types";
 import {
   useQuotations,
   useDeleteQuotation,
@@ -28,7 +31,6 @@ import {
   DOC_TYPES,
 } from "../constants/quotation.constants";
 import { openAuthenticatedPdf, downloadAuthenticatedPdf } from "@/shared/lib/openAuthenticatedPdf";
-import { shareViaWhatsApp } from "@/shared/lib/shareDocument";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
@@ -52,6 +54,8 @@ export function QuotationListPage() {
   const convertMutation = useConvertQuotation();
   const [confirmIssue, setConfirmIssue] = useState<Quotation | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+  // Point 2 — share the document itself, not a note promising one.
+  const [share, setShare] = useState<{ doc: Quotation; channel: MessageChannel } | null>(null);
   // ResourceListPage owns its own paging/query state, so bumping this key is
   // how an outside creation (the wizard) forces it to reload.
   const [listRefreshKey, setListRefreshKey] = useState(0);
@@ -93,14 +97,6 @@ export function QuotationListPage() {
     } catch (err) {
       toast.error(getApiErrorMessage(err));
     }
-  }
-
-  function shareWhatsApp(q: Quotation) {
-    const label = q.docType === "quotation" ? "quotation" : "proforma invoice";
-    const msg =
-      `Hello ${q.customerName},\n\nPlease find our ${label} ${q.docNumberFormatted} for ` +
-      `${formatCurrency(q.grandTotal)}. I will share the PDF here shortly.\n\nThank you.`;
-    shareViaWhatsApp(q.customerMobile, msg);
   }
 
   async function changeStatus(q: Quotation, status: DocStatus) {
@@ -238,11 +234,20 @@ export function QuotationListPage() {
               <Download className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => shareWhatsApp(q)}
-              className="rounded-md border border-green-500/30 bg-green-500/10 p-1.5 text-green-600 hover:bg-green-500/20 transition-colors"
-              title="Share on WhatsApp"
+              onClick={() => setShare({ doc: q, channel: "whatsapp" })}
+              data-testid={`share-whatsapp-${q.id}`}
+              className="rounded-md border border-green-500/30 bg-green-500/10 p-1.5 text-green-600 transition-colors hover:bg-green-500/20"
+              title="Send this document on WhatsApp"
             >
               <MessageCircle className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setShare({ doc: q, channel: "email" })}
+              data-testid={`share-email-${q.id}`}
+              className="rounded-md border border-border bg-background p-1.5 transition-colors hover:bg-accent"
+              title="Email this document"
+            >
+              <Mail className="h-3.5 w-3.5" />
             </button>
 
             {/* PI → Tax Invoice (point 10) */}
@@ -288,6 +293,16 @@ export function QuotationListPage() {
         onOpenChange={setWizardOpen}
         docType={docType}
         onSuccess={() => setListRefreshKey((k) => k + 1)}
+      />
+
+      <SendMessageDialog
+        open={Boolean(share)}
+        onOpenChange={(open) => !open && setShare(null)}
+        channel={share?.channel ?? "whatsapp"}
+        leadId={share?.doc.leadId ?? undefined}
+        to={share?.channel === "email" ? share?.doc.customerEmail : share?.doc.customerMobile}
+        documentId={share?.doc.id}
+        documentLabel={share?.doc.docNumberFormatted}
       />
 
       {confirmIssue && (

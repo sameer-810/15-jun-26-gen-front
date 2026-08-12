@@ -11,11 +11,16 @@ import {
   Settings2,
   ReceiptIndianRupee,
   CheckCircle2,
+  MessageCircle,
+  Calculator,
+  Mail as MailIcon,
 } from "lucide-react";
 import { useLeadWorkspace, useLogCall } from "../hooks/useLeadWorkspace";
 import { ManageLeadDialog } from "../components/ManageLeadDialog";
 import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
 import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog";
+import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
+import type { MessageChannel } from "@/modules/messaging/types";
 import { ACTIVITY_META } from "@/modules/activity/constants/activity.constants";
 import {
   LEAD_STATUS_LABELS,
@@ -91,6 +96,7 @@ export function LeadDetailPage() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [callOpen, setCallOpen] = useState(false);
   const [callOutcome, setCallOutcome] = useState("connected");
+  const [sendChannel, setSendChannel] = useState<MessageChannel | null>(null);
   const [callNote, setCallNote] = useState("");
 
   if (isLoading) return <PageLoader />;
@@ -208,14 +214,38 @@ export function LeadDetailPage() {
               <Settings2 className="h-4 w-4" /> Manage Lead
             </button>
             <button
+              onClick={() => setSendChannel("whatsapp")}
+              data-testid="detail-whatsapp"
+              className="flex items-center gap-1.5 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-500/20 dark:text-green-400"
+            >
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </button>
+            <button
+              onClick={() => setSendChannel("email")}
+              data-testid="detail-email"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+            >
+              <MailIcon className="h-4 w-4" /> Email
+            </button>
+            <button
               onClick={() => setCallOpen(true)}
               data-testid="open-log-call"
               className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
             >
               <PhoneCall className="h-4 w-4" /> Log Call
             </button>
+            {/* Size the genset first, then quote it — the calculator carries
+                this customer through to the document. */}
+            <Link
+              to={`/capacity-calculator?leadId=${lead.id}`}
+              data-testid="detail-calculate"
+              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+            >
+              <Calculator className="h-4 w-4" /> Calculate
+            </Link>
             <button
               onClick={() => setQuoteOpen(true)}
+              data-testid="detail-quote"
               className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
             >
               <FileText className="h-4 w-4" /> Quote
@@ -460,6 +490,15 @@ export function LeadDetailPage() {
         defaultDocType="quotation"
         prefill={quotePrefill}
         onSuccess={() => void refetch()}
+      />
+
+      <SendMessageDialog
+        open={Boolean(sendChannel)}
+        onOpenChange={(open) => !open && setSendChannel(null)}
+        channel={sendChannel ?? "whatsapp"}
+        leadId={lead.id}
+        to={sendChannel === "email" ? lead.email : lead.mobile}
+        onSent={() => void refetch()}
       />
 
       {/* Log call — the outcome prompt is what makes the Calls counter real. */}

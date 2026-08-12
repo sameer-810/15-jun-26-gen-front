@@ -1,12 +1,27 @@
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
-import { Pencil, MessageSquare, CheckCircle2, History, FileText, Trash2 } from "lucide-react";
+import {
+  Pencil,
+  MessageSquare,
+  CheckCircle2,
+  History,
+  FileText,
+  Trash2,
+  MessageCircle,
+  Mail,
+  Phone,
+  Upload,
+} from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { LeadDialog } from "../components/LeadDialog";
 import { FollowUpDialog } from "../components/FollowUpDialog";
 import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
 import { LeadTimelineDialog } from "@/modules/activity/components/LeadTimelineDialog";
 import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog";
+import { LeadImportDialog } from "../components/LeadImportDialog";
+import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
+import { useLogCall } from "../hooks/useLeadWorkspace";
+import type { MessageChannel } from "@/modules/messaging/types";
 import { useLeads, useDeleteLead, useBulkDeleteLeads } from "../hooks/useLeads";
 import {
   LEAD_STATUS_LABELS,
@@ -68,6 +83,12 @@ export function LeadListPage() {
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [quotePrefill, setQuotePrefill] = useState<QuotationPrefill | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  // Send dialog — one component, opened per channel from the row.
+  const [sendTo, setSendTo] = useState<{ lead: Lead; channel: MessageChannel } | null>(null);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const logCall = useLogCall();
 
   const bulkDelete = useBulkDeleteLeads();
   const [confirmBulk, setConfirmBulk] = useState<{ ids: string[]; clear: () => void } | null>(null);
@@ -96,6 +117,19 @@ export function LeadListPage() {
 
   return (
     <>
+      {/* Point 7 — import with the data-format instructions shown first. */}
+      {(role === "admin" || role === "manager") && (
+        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            data-testid="open-lead-import"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            <Upload className="h-4 w-4" /> Import Leads
+          </button>
+        </div>
+      )}
+
       <ResourceListPage<Lead, LeadListQuery>
         title="Leads"
         subtitle="Generator enquiries and the lead-to-sale pipeline"
@@ -105,6 +139,17 @@ export function LeadListPage() {
         emptyText="No leads found. Create your first lead."
         deleteConfirmText="Delete this lead? This removes it from the pipeline (history is retained)."
         columns={[
+          {
+            // Point 8 — date and time in the first row. For an imported lead the
+            // enquiry timestamp at the source is the one the team cares about,
+            // not when our poller happened to see it.
+            header: "Received",
+            getValue: (l) => (
+              <span className="whitespace-nowrap text-xs font-medium">
+                {formatDateTime(l.externalCreatedAt || l.createdAt)}
+              </span>
+            ),
+          },
           {
             // Point 13 — clicking the lead opens its detail workspace.
             header: "Customer",
@@ -180,16 +225,6 @@ export function LeadListPage() {
               </span>
             ),
           },
-          {
-            // For an imported lead the enquiry timestamp at the source is the
-            // one the team cares about, not when our poller saw it.
-            header: "Received",
-            getValue: (l) => (
-              <span className="whitespace-nowrap text-xs">
-                {formatDateTime(l.externalCreatedAt || l.createdAt)}
-              </span>
-            ),
-          },
           { header: "Assigned", getValue: (l) => l.assignedTo?.name || "-" },
           {
             header: "Next Follow-up",
@@ -210,6 +245,8 @@ export function LeadListPage() {
           location: location.trim() || undefined,
           minQuantity: toQty(minQty),
           maxQuantity: toQty(maxQty),
+          startDate: startDate || undefined,
+          endDate: endDate || undefined,
           page,
           limit,
         })}
@@ -280,6 +317,30 @@ export function LeadListPage() {
               </div>
             </div>
             <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">
+                Received between
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  aria-label="Received from"
+                  data-testid="lead-start-date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`${filterInputCls} w-[140px]`}
+                />
+                <span className="text-muted-foreground">–</span>
+                <input
+                  type="date"
+                  aria-label="Received to"
+                  data-testid="lead-end-date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`${filterInputCls} w-[140px]`}
+                />
+              </div>
+            </div>
+            <div>
               <label
                 className="block text-xs font-medium text-muted-foreground mb-1"
                 htmlFor="lead-status-filter"
@@ -341,6 +402,39 @@ export function LeadListPage() {
             >
               <FileText className="h-3 w-3" /> Quote
             </button>
+            {/* Point 1 — reach the customer straight from the row. */}
+            <button
+              onClick={() => setSendTo({ lead, channel: "whatsapp" })}
+              data-testid={`whatsapp-${lead.id}`}
+              className="flex items-center gap-1 rounded-md border border-green-500/30 bg-green-500/10 px-2 py-1.5 text-xs font-medium text-green-700 transition-colors hover:bg-green-500/20 dark:text-green-400"
+              title="Send a WhatsApp message"
+            >
+              <MessageCircle className="h-3 w-3" />
+            </button>
+            <button
+              onClick={() => setSendTo({ lead, channel: "email" })}
+              data-testid={`email-${lead.id}`}
+              className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+              title="Send an email"
+            >
+              <Mail className="h-3 w-3" />
+            </button>
+            <a
+              href={lead.mobile ? `tel:${lead.mobile}` : undefined}
+              onClick={() => {
+                // Opening the dialler is the call; log it so the engagement
+                // counters and the lead history reflect the attempt.
+                if (lead.mobile) logCall.mutate({ leadId: lead.id, outcome: "connected" });
+              }}
+              data-testid={`call-${lead.id}`}
+              aria-disabled={!lead.mobile}
+              className={`flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium transition-colors ${
+                lead.mobile ? "hover:bg-accent" : "pointer-events-none opacity-40"
+              }`}
+              title={lead.mobile ? `Call ${lead.mobile}` : "No mobile number"}
+            >
+              <Phone className="h-3 w-3" />
+            </a>
             <button
               onClick={() => {
                 setFollowLead(lead);
@@ -417,6 +511,16 @@ export function LeadListPage() {
         defaultDocType="quotation"
         prefill={quotePrefill}
         onSuccess={() => setQuotePrefill(null)}
+      />
+
+      <LeadImportDialog open={importOpen} onOpenChange={setImportOpen} />
+
+      <SendMessageDialog
+        open={Boolean(sendTo)}
+        onOpenChange={(open) => !open && setSendTo(null)}
+        channel={sendTo?.channel ?? "whatsapp"}
+        leadId={sendTo?.lead.id}
+        to={sendTo?.channel === "email" ? sendTo?.lead.email : sendTo?.lead.mobile}
       />
 
       {confirmBulk && (

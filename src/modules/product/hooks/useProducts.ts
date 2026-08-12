@@ -6,6 +6,7 @@ import {
   updateProduct,
   deleteProduct,
   searchProductOptions,
+  suggestGensets,
   getProductFacets,
 } from "../api/productApi";
 import type { ProductListQuery, ProductCreatePayload, ProductListResult } from "../types";
@@ -34,6 +35,19 @@ export function useProductOptions(search: string, enabled = true) {
     queryKey: ["products", "options", search],
     queryFn: () => searchProductOptions(search),
     enabled,
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Gensets big enough for a calculated load. Only fires once a calculation has
+ * produced a kVA figure.
+ */
+export function useGensetSuggestions(minKva: number | null) {
+  return useQuery({
+    queryKey: ["products", "options", "minKva", minKva],
+    queryFn: () => suggestGensets(minKva as number),
+    enabled: Boolean(minKva),
     staleTime: 60_000,
   });
 }

@@ -5,6 +5,8 @@ import {
   FileText,
   BookOpen,
   Boxes,
+  LayoutTemplate,
+  MapPin,
   ReceiptIndianRupee,
   BarChart3,
   Activity,
@@ -93,6 +95,18 @@ const SECTIONS: MenuSection[] = [
   {
     heading: "Administration",
     items: [
+      {
+        label: "Templates",
+        to: "/templates",
+        icon: LayoutTemplate,
+        roles: ["admin", "manager", "sales", "inventory"],
+      },
+      {
+        label: "Locations",
+        to: "/locations",
+        icon: MapPin,
+        roles: ["admin", "manager", "inventory"],
+      },
       { label: "Settings", to: "/settings", icon: Settings, roles: ["admin"] },
       { label: "Users", to: "/users", icon: Users, roles: ["admin"] },
     ],

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FormDialog } from "@/modules/common/FormDialog";
+import { LocationSelect } from "@/modules/location/LocationSelect";
 import { useCreateSale } from "../hooks/useSales";
 import { useInventoryOptions } from "@/modules/inventory/hooks/useInventory";
 import { getApiErrorMessage } from "@/shared/api/http";
@@ -170,12 +171,13 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
           >
             Location
           </label>
-          <input
+          {/* Point 9 — dropdown from the Location master list. */}
+          <LocationSelect
             id="sale-location"
+            data-testid="sale-location-select"
             className={inputCls}
-            placeholder="Dispatch branch / godown"
             value={location}
-            onChange={(e) => setLocation(e.target.value)}
+            onChange={setLocation}
           />
         </div>
         <div className="flex items-end">

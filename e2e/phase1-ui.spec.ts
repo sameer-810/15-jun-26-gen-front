@@ -358,7 +358,11 @@ test.describe("Point 9 — Inventory and Sales", () => {
 
     const dialog = page.locator("div.fixed.inset-0").filter({ hasText: "New Generator Model" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByPlaceholder("Branch / godown, e.g. Mumbai Yard")).toBeVisible();
+    // The 11-Aug change request (point 9) replaced the free-text box with a
+    // dropdown fed by the Location master list.
+    const location = page.getByTestId("inventory-location");
+    await expect(location).toBeVisible();
+    expect(await location.evaluate((el) => el.tagName)).toBe("SELECT");
     await dialog.getByRole("button", { name: "Cancel" }).click();
   });
 

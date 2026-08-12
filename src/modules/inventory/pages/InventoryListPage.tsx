@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, PackagePlus, Download, Upload, Trash2 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
+import { LocationSelect } from "@/modules/location/LocationSelect";
 import { InventoryDialog } from "../components/InventoryDialog";
 import { AddStockDialog } from "../components/AddStockDialog";
 import { useInventory, useDeleteInventory } from "../hooks/useInventory";
@@ -178,11 +179,12 @@ export function InventoryListPage() {
               >
                 Location
               </label>
-              <input
+              <LocationSelect
                 id="inventory-location-filter"
+                data-testid="inventory-location-filter"
+                allowAll
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="Branch / godown..."
+                onChange={setLocation}
                 className={filterInputCls}
               />
             </div>

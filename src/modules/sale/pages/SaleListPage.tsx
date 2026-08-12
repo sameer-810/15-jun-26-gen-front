@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { PageLoader } from "@/shared/components/PageLoader";
+import { LocationSelect } from "@/modules/location/LocationSelect";
 
 const filterInputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
@@ -105,14 +106,15 @@ export function SaleListPage() {
           >
             Location
           </label>
-          <input
+          <LocationSelect
             id="sale-location-filter"
+            data-testid="sale-location-filter"
+            allowAll
             value={location}
-            onChange={(e) => {
-              setLocation(e.target.value);
+            onChange={(v) => {
+              setLocation(v);
               setPage(1);
             }}
-            placeholder="Branch / godown..."
             className={filterInputCls}
           />
         </div>

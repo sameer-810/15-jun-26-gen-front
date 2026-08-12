@@ -19,6 +19,11 @@ export type BusinessProfile = {
   bankAccountNumber?: string;
   bankIfsc?: string;
   defaultTerms?: string[];
+  /** Letterhead artwork rendered on generated PDFs (point 6). */
+  letterheadHeaderUrl?: string;
+  letterheadFooterUrl?: string;
+  signatureUrl?: string;
+  closingLines?: string[];
 };
 
 export async function getBusinessProfile() {

@@ -1,8 +1,15 @@
-import { useState } from "react";
-import { Calculator, Plus, Trash2, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { Calculator, FileText, Plus, Trash2, Zap } from "lucide-react";
 import { useCalculateCapacity } from "../hooks/useCapacity";
 import type { ApplianceCategory, ApplianceInput, CapacityResult } from "../types";
+import { useGensetSuggestions } from "@/modules/product/hooks/useProducts";
+import { useLeadWorkspace } from "@/modules/lead/hooks/useLeadWorkspace";
+import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog";
+import type { ProductOption } from "@/modules/product/types";
+import type { QuotationPrefill } from "@/modules/quotation/types";
 import { getApiErrorMessage } from "@/shared/api/http";
+import { formatCurrency } from "@/lib/utils";
 import { toast } from "@/shared/lib/toast";
 
 const CATEGORY_LABELS: Record<ApplianceCategory, string> = {
@@ -28,12 +35,55 @@ const STARTER_ROWS: Row[] = [
   { category: "ac", name: "1.5 Ton AC", quantity: 1, watts: 1500 },
 ];
 
+/**
+ * The line item a quotation starts from when the catalog has nothing at this
+ * rating — the sizing itself, written out so the customer can see the working.
+ */
+function describeLoad(result: CapacityResult): string {
+  const load = result.items.map((it) => `${it.quantity} x ${it.name} (${it.watts} W)`).join(", ");
+  return [
+    `${result.recommendedStandardKva} kVA diesel generator set`,
+    `Sized for a running load of ${result.runningKva} kVA and a peak of ${result.peakKva} kVA ` +
+      `at ${result.inputs.powerFactor} power factor, including a ${result.inputs.safetyMarginPct}% safety margin.`,
+    `Connected load: ${load}.`,
+  ].join("\n");
+}
+
 export function CapacityCalculatorPage() {
+  const [params] = useSearchParams();
+  // Reached from a lead's "Calculate" button — the quotation then carries the
+  // customer through, so nothing is retyped (point 4: calculate, then quote).
+  const leadId = params.get("leadId") ?? undefined;
+  const { data: workspace } = useLeadWorkspace(leadId);
+  const lead = workspace?.lead;
+
   const [rows, setRows] = useState<Row[]>(STARTER_ROWS);
   const [powerFactor, setPowerFactor] = useState(0.8);
   const [safetyMargin, setSafetyMargin] = useState(25);
   const [result, setResult] = useState<CapacityResult | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
   const calc = useCalculateCapacity();
+
+  // Only gensets that can actually carry the calculated load, smallest first.
+  const { data: suggestions } = useGensetSuggestions(result?.recommendedStandardKva ?? null);
+  const picked: ProductOption | null = suggestions?.find((s) => s.id === pickedId) ?? null;
+
+  const quotePrefill: QuotationPrefill | null = useMemo(() => {
+    if (!result) return null;
+    const defaults = picked?.quotationDefaults;
+    return {
+      customerName: lead?.customerName ?? "",
+      customerMobile: lead?.mobile,
+      customerEmail: lead?.email,
+      customerAddress: lead?.address,
+      customerState: lead?.state,
+      description: defaults?.description || describeLoad(result),
+      kva: defaults?.kva ?? result.recommendedStandardKva,
+      quantity: 1,
+      unitPrice: defaults?.unitPrice ?? 0,
+    };
+  }, [result, picked, lead]);
 
   function updateRow(i: number, patch: Partial<Row>) {
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
@@ -65,6 +115,8 @@ export function CapacityCalculatorPage() {
         safetyMarginPct: Number(safetyMargin),
       });
       setResult(res);
+      // A new sizing invalidates the genset picked against the old one.
+      setPickedId(null);
     } catch (err) {
       toast.error(getApiErrorMessage(err));
     }
@@ -78,8 +130,13 @@ export function CapacityCalculatorPage() {
           <h1 className="text-xl font-bold text-foreground">Generator Capacity Calculator</h1>
           <p className="text-sm text-muted-foreground">
             Enter the connected load to get a recommended genset size (with motor start-up surge and
-            safety margin)
+            safety margin), then quote it
           </p>
+          {lead && (
+            <p className="mt-1 text-sm font-medium text-primary" data-testid="calc-for-lead">
+              Sizing for {lead.customerName}
+            </p>
+          )}
         </div>
       </div>
 
@@ -219,13 +276,107 @@ export function CapacityCalculatorPage() {
           </div>
           {result.surgeContributor && (
             <p className="mt-3 text-xs text-muted-foreground">
-              Largest start-up surge from: <strong>{result.surgeContributor}</strong>. Tip: enter
-              this <strong>{result.recommendedStandardKva} kVA</strong> in a lead's "Required KVA"
-              field to carry it forward to a quotation.
+              Largest start-up surge from: <strong>{result.surgeContributor}</strong>.
             </p>
           )}
+
+          {/* Calculate, then quote — the sizing carries straight into the document. */}
+          <div className="mt-5 border-t border-primary/20 pt-4" data-testid="calc-to-quote">
+            <p className="text-sm font-semibold text-foreground">Quote this sizing</p>
+            {suggestions && suggestions.length > 0 ? (
+              <>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Catalog gensets rated for {result.recommendedStandardKva} kVA or above — the
+                  description, price and GST come across with the pick.
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {suggestions.map((s) => (
+                    <label
+                      key={s.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 text-sm transition ${
+                        pickedId === s.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-background hover:bg-accent"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="genset"
+                        className="h-4 w-4"
+                        checked={pickedId === s.id}
+                        onChange={() => setPickedId(s.id)}
+                        data-testid={`pick-genset-${s.id}`}
+                      />
+                      {s.primaryImageUrl && (
+                        <img
+                          src={s.primaryImageUrl}
+                          alt=""
+                          className="h-9 w-9 rounded object-cover"
+                        />
+                      )}
+                      <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+                        {s.name}
+                        {s.kva ? (
+                          <span className="ml-2 text-xs text-muted-foreground">{s.kva} kVA</span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {formatCurrency(s.price)}
+                      </span>
+                    </label>
+                  ))}
+                  <label
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 text-sm transition ${
+                      pickedId === null
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-background hover:bg-accent"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="genset"
+                      className="h-4 w-4"
+                      checked={pickedId === null}
+                      onChange={() => setPickedId(null)}
+                      data-testid="pick-genset-none"
+                    />
+                    <span className="text-foreground">
+                      None of these — quote the calculated size with the working written out
+                    </span>
+                  </label>
+                </div>
+              </>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                No catalog genset is rated for {result.recommendedStandardKva} kVA yet, so the
+                quotation starts from the calculated size and the load breakdown. Add the model to
+                the Catalog to have its description and price come across automatically.
+              </p>
+            )}
+
+            <button
+              onClick={() => setQuoteOpen(true)}
+              data-testid="calc-create-quotation"
+              className="mt-3 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors"
+            >
+              <FileText className="h-4 w-4" /> Create Quotation
+            </button>
+          </div>
         </div>
       )}
+
+      <QuotationDialog
+        open={quoteOpen}
+        onOpenChange={setQuoteOpen}
+        mode="create"
+        value={null}
+        defaultDocType="quotation"
+        prefill={quotePrefill}
+        onSuccess={() => {
+          setQuoteOpen(false);
+          toast.success("Quotation created from the calculated load");
+        }}
+      />
     </div>
   );
 }

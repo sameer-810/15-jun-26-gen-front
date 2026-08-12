@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Star, ImagePlus, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Pencil, Trash2, Star, ImagePlus, X, MapPin } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
 import { MediaPickerDialog } from "@/modules/media/components/MediaPickerDialog";
 import {
@@ -137,13 +138,25 @@ export function TemplatesPage() {
             Reusable descriptions, terms and message bodies
           </p>
         </div>
-        <button
-          onClick={() => openEditor(null)}
-          data-testid="new-template"
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" /> New {TEMPLATE_KIND_LABELS[kind]}
-        </button>
+        <div className="flex items-center gap-2">
+          {/* The location master list is the other reusable list the client
+              asked for "in the template section" — kept on its own screen
+              because it feeds dropdowns rather than text, and linked here. */}
+          <Link
+            to="/locations"
+            data-testid="locations-link"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            <MapPin className="h-4 w-4" /> Location list
+          </Link>
+          <button
+            onClick={() => openEditor(null)}
+            data-testid="new-template"
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" /> New {TEMPLATE_KIND_LABELS[kind]}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">

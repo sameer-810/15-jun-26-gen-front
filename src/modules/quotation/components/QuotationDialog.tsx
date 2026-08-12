@@ -204,6 +204,19 @@ export function QuotationDialog({
     form.setValue(`items.${i}.specs`, option.specs ?? [], opts);
   }
 
+  /**
+   * Apply a saved description template to line item `i` (point 4). Unlike a
+   * catalog product this carries wording only — price, HSN and GST are left
+   * alone, so a template can be dropped onto a line already priced.
+   */
+  function applyDescriptionTemplate(i: number, templateId: string) {
+    const t = descriptionTemplates?.items.find((x) => x.id === templateId);
+    if (!t) return;
+    const opts = { shouldDirty: true, shouldValidate: true } as const;
+    form.setValue(`items.${i}.description`, t.body, opts);
+    if (t.imageUrl) form.setValue(`items.${i}.imageUrl`, t.imageUrl, opts);
+  }
+
   /** Pull the last billing/shipping block used for this customer (point 6). */
   async function autoFetchCustomer() {
     const mobile = form.getValues("customerMobile");
@@ -308,6 +321,12 @@ export function QuotationDialog({
   // picker on the description.
   const { data: termsTemplates } = useTemplates(
     { kind: "terms", activeOnly: true, limit: 50 },
+    open,
+  );
+  // ...and the same for the item description: a written-once wording the client
+  // reuses, alongside picking a product straight from the catalog.
+  const { data: descriptionTemplates } = useTemplates(
+    { kind: "description", activeOnly: true, limit: 50 },
     open,
   );
 
@@ -489,11 +508,30 @@ export function QuotationDialog({
                       {...form.register(`items.${i}.description`)}
                     />
                   </div>
-                  <div className="w-44 shrink-0 pt-[22px]">
+                  <div className="w-44 shrink-0 space-y-1.5 pt-[22px]">
                     <ProductPicker
                       data-testid={`product-picker-${i}`}
                       onSelect={(option) => applyProduct(i, option)}
                     />
+                    {descriptionTemplates?.items.length ? (
+                      <select
+                        aria-label="Description template"
+                        data-testid={`description-template-picker-${i}`}
+                        className={inputCls}
+                        value=""
+                        onChange={(e) => {
+                          applyDescriptionTemplate(i, e.target.value);
+                          e.target.value = "";
+                        }}
+                      >
+                        <option value="">Use a template…</option>
+                        {descriptionTemplates.items.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                   </div>
                 </div>
 

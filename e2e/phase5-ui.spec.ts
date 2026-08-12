@@ -437,3 +437,42 @@ test.describe("Second pass — the same three gaps, in the browser", () => {
     await expect(dialog).toContainText(/attached as a PDF|secure link/);
   });
 });
+
+test.describe("Third pass — description templates reach the quotation", () => {
+  test("a saved description template can be applied to a line item", async ({ page }) => {
+    const t = (
+      await (
+        await ctx.post(`${API}/templates`, {
+          data: {
+            kind: "description",
+            name: `${RUN_TAG} Silent DG`,
+            body: `${RUN_TAG} 62.5 kVA silent diesel generating set\nAcoustic enclosure, AMF panel.`,
+          },
+        })
+      ).json()
+    ).data;
+    track("templates", t.id);
+
+    await page.goto("/quotations");
+    await waitForTable(page);
+    await page.getByRole("button", { name: /New Quotation/ }).click();
+
+    // The description kind is offered on the line item, beside the catalog picker.
+    const picker = page.getByTestId("description-template-picker-0");
+    await expect(picker).toBeVisible();
+    await picker.selectOption(t.id);
+
+    await expect(page.locator("#item-description-0")).toHaveValue(
+      new RegExp(`${RUN_TAG} 62.5 kVA silent`),
+    );
+    // Wording only: a template must not overwrite a price already entered.
+    await expect(page.locator("input[name='items.0.unitPrice']")).toHaveValue("0");
+  });
+
+  test("the location list is reachable from the Templates section", async ({ page }) => {
+    await page.goto("/templates");
+    await expect(page.getByTestId("templates-page")).toBeVisible();
+    await page.getByTestId("locations-link").click();
+    await expect(page.getByTestId("locations-page")).toBeVisible();
+  });
+});

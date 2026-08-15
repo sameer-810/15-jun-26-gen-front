@@ -83,7 +83,7 @@ export function ProductPicker({
           // Anchored to the trigger's RIGHT edge so the menu opens inward.
           // Anchoring left made a 420px menu hang off a 176px trigger and
           // pushed the whole dialog into horizontal scroll.
-          className="absolute right-0 z-50 mt-1 w-[min(420px,70vw)] rounded-lg border border-border bg-card shadow-xl"
+          className="pg-overlay absolute right-0 z-50 mt-1 w-[min(420px,70vw)]"
         >
           <div className="border-b border-border p-2">
             <div className="relative">

@@ -127,6 +127,7 @@ export function ProductListPage() {
         newButtonText="New Product"
         searchPlaceholder="Search by name, brand or model..."
         minTableWidth="min-w-[1200px]"
+        rowOpensEditor
         emptyText="No catalog products yet. Add one, or import a spreadsheet."
         deleteConfirmText="Remove this product from the catalog? Existing quotations keep their copy."
         hideCreateButton={!canManage}

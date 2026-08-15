@@ -41,10 +41,7 @@ export function FormDialog({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cn(
-          "w-full rounded-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[90vh]",
-          sizeMap[size],
-        )}
+        className={cn("pg-overlay flex max-h-[90vh] w-full flex-col", sizeMap[size])}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0">

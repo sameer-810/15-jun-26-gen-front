@@ -2,11 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── SRF Power Machine CRM — "Cobalt / Slate" palette (2026) ────────────────────────
-   2026 premium direction: elevated cool-slate neutrals (no flat white/black),
-   one confident brand accent used with high contrast, dark-mode-first, and
-   functional status colours. Brand accent is SRF Power Machine cobalt blue; headers use
-   a cobalt→sky gradient. Tokens stay in HSL (shadcn-style).
+/* ─── SRF Power Machine CRM — "Cobalt / Slate" palette ───────────────────────
+   Cool-slate neutrals carrying the surfaces, one brand accent (the cobalt from
+   the client's own mark) reserved for interaction, and three functional status
+   colours. Tokens stay in HSL (shadcn-style).
+
+   Colour does one job here: it tells you what something IS (status) or that you
+   can ACT on it (cobalt). It is never used to make a panel look richer. See
+   DESIGN.md.
 ─────────────────────────────────────────────────────────────────────────── */
 
 @layer base {
@@ -106,7 +109,7 @@
     @apply bg-background text-foreground antialiased;
   }
   html {
-    font-family: Inter, system-ui, sans-serif;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
   }
 }
 
@@ -116,8 +119,17 @@ body,
   height: 100%;
 }
 
+/**
+ * Page rhythm.
+ *
+ * The fade-and-rise on mount is deliberately gone. It cost ~200ms before the
+ * user could read anything, on a screen they open forty times a day, to buy an
+ * effect only visible the once. Internal tools should feel instant, not
+ * cinematic — and it is the single most common mount animation in generated
+ * code.
+ */
 .erp-page {
-  @apply space-y-6 animate-fade-in;
+  @apply space-y-5;
 }
 
 /* Number inputs in dense grids (quotation/PI line items). The native spinner
@@ -133,84 +145,63 @@ body,
   appearance: textfield;
 }
 
-/* ── 2026 polish ──────────────────────────────────────────────────────────── */
+/* ── Surfaces ─────────────────────────────────────────────────────────────────
+   What used to live here was the reason the client said "this looks like AI":
+   a cobalt→sky gradient-text helper, glassmorphism on the top bar, a blurred
+   radial brand glow behind the dashboard header, two animated aurora blobs, and
+   a hover-lift that made every card jump. Those five effects are the documented
+   signature of generated UI, and not one of them helped anybody read a number.
+   They are gone. What replaces them is the boring part done properly: one
+   container primitive, ledger numerals, and a real elevation rule.
+─────────────────────────────────────────────────────────────────────────── */
 
-/* Brand gradient text helper for headers — cobalt → sky. */
-.pg-gradient-text {
-  @apply bg-clip-text text-transparent;
-  background-image: linear-gradient(to right, hsl(224 76% 52%), hsl(199 89% 52%));
-}
-
-/* Ledger-style numerals so figures align in columns. */
+/* Ledger numerals, so a column of figures lines up digit over digit. Applied to
+   every table automatically because a CRM is mostly tables. */
 table,
 .pg-nums {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
 
-/* Measured glassmorphism for the top bar and overlays. */
-.pg-glass {
-  @apply border border-border/60 bg-card/70 backdrop-blur-xl;
+/**
+ * The one container primitive.
+ *
+ * A panel in a data product is a *boundary*, not an object sitting on a desk:
+ * it says "these figures belong together", nothing more. So it gets a hairline
+ * and a background shift and no shadow at all. Shadow here is a real signal
+ * reserved for things that genuinely float — see .pg-overlay.
+ */
+.pg-panel {
+  @apply rounded-lg border border-border bg-card;
 }
 
-/* Card hover lift — weight without theatrics. */
-.pg-lift {
-  @apply transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg;
-}
-
-/* Bento tile base. */
+/* Padded variant, for panels holding prose or a chart rather than a table. */
 .pg-tile {
-  @apply rounded-2xl border border-border bg-card p-5 shadow-sm;
+  @apply rounded-lg border border-border bg-card p-4;
 }
 
-/* Ambient brand glow behind hero areas. */
-.pg-glow::before {
-  content: "";
-  @apply pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full opacity-30 blur-3xl;
-  background: radial-gradient(circle, hsl(var(--primary)) 0%, transparent 70%);
+/**
+ * Elevation, spent only where it means something: this thing is above the page
+ * and modal to it. Dropdowns, popovers, the command palette, dialogs, the
+ * mobile drawer. Nothing that sits *in* the page may use it.
+ */
+.pg-overlay {
+  @apply rounded-xl border border-border bg-popover shadow-2xl;
 }
 
-/* Animated aurora blobs (login brand panel). */
-@keyframes pg-float-a {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(30px, -24px) scale(1.12);
-  }
-}
-@keyframes pg-float-b {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1.05);
-  }
-  50% {
-    transform: translate(-26px, 22px) scale(0.92);
-  }
-}
-.pg-aurora-a {
-  animation: pg-float-a 16s ease-in-out infinite;
-}
-.pg-aurora-b {
-  animation: pg-float-b 20s ease-in-out infinite;
+/**
+ * Sticky column headers inside scrolling tables.
+ *
+ * Fully opaque, deliberately. A translucent sticky header is the same mistake
+ * as a frosted top bar: the rows sliding underneath stay half-visible through
+ * the column names, and at speed the header looks like it is vibrating.
+ */
+.pg-thead {
+  @apply sticky top-0 z-10 bg-muted;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pg-aurora-a,
-  .pg-aurora-b {
-    animation: none;
-  }
-}
-
-/* Smooth theme transitions */
-html {
-  transition:
-    background-color 240ms ease,
-    color 240ms ease;
-}
-
-/* Thin custom scrollbars for a premium feel */
+/* Thin scrollbars — the app is table-heavy and the default Windows bar eats
+   horizontal room in dense grids. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

@@ -5,7 +5,7 @@ import { SaleDialog } from "../components/SaleDialog";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { PageLoader } from "@/shared/components/PageLoader";
 import { LocationSelect } from "@/modules/location/LocationSelect";
 
@@ -190,27 +190,35 @@ export function SaleListPage() {
       {isLoading ? (
         <PageLoader />
       ) : (
-        <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full text-sm min-w-[1100px]">
-            <thead className="border-b border-border bg-muted/40">
-              <tr>
+        // This page predates the shared ResourceListPage, so it carried the old
+        // table styling. Brought in line with every other list: pinned header,
+        // no elevation on an in-page panel, actions last. Numeric columns are
+        // right-aligned so the rupee figures line up on their last digit.
+        <div className="pg-panel max-h-[calc(100vh-15rem)] overflow-auto">
+          <table className="w-full min-w-[1100px] text-sm">
+            <thead className="pg-thead">
+              <tr className="border-b border-border">
                 {[
-                  ...(canDelete ? ["Actions"] : []),
-                  "Date",
-                  "Customer",
-                  "Model",
-                  "KVA",
-                  "Location",
-                  "Qty",
-                  "Unit ₹",
-                  "Total ₹",
-                  "Sales Exec",
+                  { label: "Date" },
+                  { label: "Customer" },
+                  { label: "Model" },
+                  { label: "KVA", numeric: true },
+                  { label: "Location" },
+                  { label: "Qty", numeric: true },
+                  { label: "Unit ₹", numeric: true },
+                  { label: "Total ₹", numeric: true },
+                  { label: "Sales Exec" },
+                  ...(canDelete ? [{ label: "Actions", numeric: true }] : []),
                 ].map((h) => (
                   <th
-                    key={h}
-                    className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap"
+                    key={h.label}
+                    scope="col"
+                    className={cn(
+                      "whitespace-nowrap px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground",
+                      h.numeric ? "text-right" : "text-left",
+                    )}
                   >
-                    {h}
+                    {h.label}
                   </th>
                 ))}
               </tr>
@@ -219,7 +227,11 @@ export function SaleListPage() {
               {sales.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canDelete ? 9 : 8}
+                    // 9 data columns (Date…Sales Exec) plus Actions when the
+                    // user can void. Was 9/8 — one short either way, so the
+                    // "No sales recorded yet" cell stopped short of the last
+                    // column and the empty state sat off-centre.
+                    colSpan={canDelete ? 10 : 9}
                     className="px-4 py-12 text-center text-muted-foreground"
                   >
                     No sales recorded yet.
@@ -227,28 +239,39 @@ export function SaleListPage() {
                 </tr>
               ) : (
                 sales.map((s) => (
-                  <tr key={s.id} className="hover:bg-muted/30 transition-colors">
-                    {canDelete && (
-                      <td className="px-4 py-2.5">
-                        <button
-                          onClick={() => setConfirmDelete(s.id)}
-                          className="flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3" /> Void
-                        </button>
-                      </td>
-                    )}
-                    <td className="px-4 py-2.5">{formatDate(s.saleDate)}</td>
-                    <td className="px-4 py-2.5 font-medium">{s.customerName}</td>
-                    <td className="px-4 py-2.5">{s.modelName}</td>
-                    <td className="px-4 py-2.5 font-mono">{s.kva ?? "-"}</td>
-                    <td className="px-4 py-2.5">{s.location || "-"}</td>
-                    <td className="px-4 py-2.5">{s.quantity}</td>
-                    <td className="px-4 py-2.5">{formatCurrency(s.unitPrice)}</td>
-                    <td className="px-4 py-2.5 font-semibold">{formatCurrency(s.totalAmount)}</td>
-                    <td className="px-4 py-2.5 text-muted-foreground">
+                  <tr key={s.id} className="transition-colors hover:bg-accent/40">
+                    <td className="whitespace-nowrap px-4 py-2 font-mono tabular-nums">
+                      {formatDate(s.saleDate)}
+                    </td>
+                    <td className="px-4 py-2 font-medium">{s.customerName}</td>
+                    <td className="px-4 py-2">{s.modelName}</td>
+                    <td className="px-4 py-2 text-right font-mono tabular-nums">{s.kva ?? "-"}</td>
+                    <td className="px-4 py-2">{s.location || "-"}</td>
+                    <td className="px-4 py-2 text-right font-mono tabular-nums">{s.quantity}</td>
+                    <td className="px-4 py-2 text-right font-mono tabular-nums">
+                      {formatCurrency(s.unitPrice)}
+                    </td>
+                    <td className="px-4 py-2 text-right font-mono font-semibold tabular-nums">
+                      {formatCurrency(s.totalAmount)}
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground">
                       {s.salesExecutiveName || s.salesExecutive?.name || "-"}
                     </td>
+                    {canDelete && (
+                      <td className="px-4 py-2">
+                        {/* Voiding a sale is irreversible, so unlike Edit/Delete
+                            elsewhere this one keeps a visible text label rather
+                            than becoming a bare icon. */}
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => setConfirmDelete(s.id)}
+                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" /> Void
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -283,7 +306,7 @@ export function SaleListPage() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="pg-overlay w-full max-w-sm p-6">
             <h3 className="text-base font-semibold text-foreground">Void Sale</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Void this sale? The sold units will be returned to inventory stock.

@@ -293,7 +293,7 @@ export function LocationsPage() {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="pg-overlay w-full max-w-sm p-6">
             <h3 className="text-base font-semibold text-foreground">Delete location</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Delete “{confirmDelete.name}”?

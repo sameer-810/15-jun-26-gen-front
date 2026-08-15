@@ -137,6 +137,11 @@ export function LeadListPage() {
         newButtonText="New Lead"
         searchPlaceholder="Search by customer, mobile, city, requirement..."
         minTableWidth="min-w-[1500px]"
+        // The row is 1500px wide and the customer name was the only 120px of it
+        // that opened the lead. Clicking anywhere in the row now does, exactly
+        // as it does in Salesforce or HubSpot — the name stays a real link, so
+        // keyboard users and "open in new tab" are unaffected.
+        rowHref={(l) => `/leads/${l.id}`}
         emptyText="No leads found. Create your first lead."
         deleteConfirmText="Delete this lead? This removes it from the pipeline (history is retained)."
         columns={[
@@ -526,7 +531,7 @@ export function LeadListPage() {
 
       {confirmBulk && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="pg-overlay w-full max-w-sm p-6">
             <h3 className="text-base font-semibold text-foreground">Delete Selected Leads</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Delete {confirmBulk.ids.length} lead(s)? Only leads marked Not Interested or

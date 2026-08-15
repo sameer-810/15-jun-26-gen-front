@@ -143,7 +143,7 @@ export function LeadDetailPage() {
   return (
     <div className="erp-page" data-testid="lead-detail">
       {/* Header */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="pg-tile">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <button
@@ -504,7 +504,7 @@ export function LeadDetailPage() {
       {/* Log call — the outcome prompt is what makes the Calls counter real. */}
       {callOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="pg-overlay w-full max-w-sm p-6">
             <h3 className="text-base font-semibold text-foreground">Log a call</h3>
             <label
               className="mt-4 mb-1 block text-xs font-medium text-muted-foreground"

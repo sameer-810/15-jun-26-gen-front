@@ -42,8 +42,9 @@ test.afterAll(async () => {
 
 async function loginAsSales(page: Page) {
   await page.goto("/login");
-  await page.getByPlaceholder("you@company.com").fill(SALES.email);
-  await page.locator('input[type="password"]').fill(SALES.password);
+  // Field ids, not placeholder copy — see the note on uiLogin in helpers.ts.
+  await page.locator("#email").fill(SALES.email);
+  await page.locator("#password").fill(SALES.password);
   await page.getByRole("button", { name: /Sign In|Login/i }).click();
   await expect(page).toHaveURL(/\/(dashboard|leads)?$/, { timeout: 15000 });
 }
@@ -66,9 +67,13 @@ test("a sales executive can reach every day-to-day feature the list asks for", a
   await expect(page.getByTestId(`email-${lead.id}`)).toBeVisible();
   await expect(page.getByTestId(`call-${lead.id}`)).toBeVisible();
 
-  // Point 8 — Received first, with the date window.
-  const headers = (await page.locator("table thead th").allInnerTexts()).map((h) => h.trim());
-  expect(headers).toContain("Received");
+  // Point 8 — Received first, with the date window. Column headers are
+  // uppercased in CSS and innerText reflects text-transform, so compare on the
+  // underlying label rather than the rendered casing.
+  const headers = (await page.locator("table thead th").allInnerTexts()).map((h) =>
+    h.trim().toLowerCase(),
+  );
+  expect(headers).toContain("received");
   await expect(page.getByTestId("lead-end-date")).toBeVisible();
 
   // Point 1 — the lead opens with its history.

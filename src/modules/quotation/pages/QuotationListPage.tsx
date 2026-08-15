@@ -148,6 +148,9 @@ export function QuotationListPage() {
         newButtonText={`New ${DOC_TYPE_LABELS[docType]}`}
         searchPlaceholder="Search by customer or number..."
         minTableWidth="min-w-[1100px]"
+        // No detail route for a quotation, so opening the record means the
+        // editor — the same thing the row's Edit button does.
+        rowOpensEditor
         emptyText="No documents yet. Create your first one."
         deleteConfirmText="Delete this document? This cannot be undone."
         columns={[
@@ -307,7 +310,7 @@ export function QuotationListPage() {
 
       {confirmIssue && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl">
+          <div className="pg-overlay w-full max-w-md p-6">
             <h3 className="text-base font-semibold text-foreground">
               Issue {confirmIssue.docNumberFormatted}?
             </h3>

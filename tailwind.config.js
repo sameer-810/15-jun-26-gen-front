@@ -42,6 +42,17 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        /**
+         * `--popover` / `--popover-foreground` were defined in index.css for
+         * both themes but never mapped here, so `bg-popover` silently did not
+         * exist and every menu, dialog and dropdown fell back to `bg-card`.
+         * They are the same value in light mode, which is why nobody noticed.
+         * Mapped now so overlays have their own surface token to diverge on.
+         */
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -58,17 +69,39 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      /**
+       * Humanist sans for the interface, monospace for data. See DESIGN.md.
+       *
+       * `mono` was never declared before, so the 15 existing `font-mono` usages
+       * fell through to Tailwind's default stack — Consolas on Windows, Menlo on
+       * macOS, something else on Linux. Quotation totals and kVA ratings
+       * rendered differently on every machine in the office.
+       *
+       * IBM Plex was built for enterprise software and the mono is a designed
+       * companion to the sans, so figures and labels sit on the same skeleton.
+       */
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["IBM Plex Sans", "system-ui", "sans-serif"],
+        mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
       },
+      /**
+       * Overlays only.
+       *
+       * The old `fade-in` (opacity + 4px rise, 200ms) was applied to whole page
+       * bodies on mount. On a tool someone opens forty times a day that is
+       * 200ms of nothing before the first number is readable, and it is the
+       * most common tell in generated interfaces. It is replaced by a shorter,
+       * opacity-only fade used exclusively where something genuinely appears
+       * over the page — menus, the command palette.
+       */
       keyframes: {
-        "fade-in": {
-          from: { opacity: "0", transform: "translateY(4px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+        "overlay-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
         },
       },
       animation: {
-        "fade-in": "fade-in 200ms ease-out",
+        "overlay-in": "overlay-in 120ms ease-out",
       },
     },
   },

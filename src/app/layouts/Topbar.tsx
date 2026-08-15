@@ -64,7 +64,16 @@ export function Topbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 pg-glass">
+      {/*
+        Was `pg-glass` — a translucent card background with a 24px backdrop
+        blur. Frosted glass is the most-cited hallmark of generated UI, but the
+        practical objection is stronger: table rows scrolling underneath a
+        blurred bar stay faintly visible as moving smears behind the
+        breadcrumbs, and it forces a compositing layer on every scroll frame in
+        a product whose main activity is scrolling long tables. Opaque, with a
+        hairline to separate it from the content.
+      */}
+      <header className="sticky top-0 z-10 border-b border-border bg-background">
         <div className="flex h-14 items-center gap-3 px-4">
           <button
             type="button"
@@ -123,7 +132,7 @@ export function Topbar() {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-12 w-60 overflow-hidden rounded-xl border border-border bg-card shadow-2xl animate-fade-in">
+              <div className="pg-overlay absolute right-0 top-12 w-60 animate-overlay-in overflow-hidden">
                 <div className="border-b border-border px-4 py-3">
                   <p className="text-sm font-semibold text-foreground">{user?.name}</p>
                   <p className="truncate text-xs text-muted-foreground">{user?.email}</p>

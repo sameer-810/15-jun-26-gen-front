@@ -379,7 +379,10 @@ test.describe("Point 9 — Inventory and Sales", () => {
 test.describe("Dashboard still renders with the new statuses", () => {
   test("the pipeline tiles read New / Open / Won / Lost", async ({ page }) => {
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    // Asserts the page rendered, not the wording of its greeting. The old
+    // "Welcome back" hero was removed in the redesign, and pinning a test to
+    // decorative copy is how a styling change turns into a red suite.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     for (const label of ["New", "Open", "Won", "Lost"]) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }

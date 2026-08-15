@@ -43,8 +43,14 @@ export async function adminApi(): Promise<{ ctx: APIRequestContext; token: strin
  */
 export async function uiLogin(page: Page) {
   await page.goto("/login");
-  await page.getByPlaceholder("you@company.com").fill(ADMIN.email);
-  await page.locator('input[type="password"]').fill(ADMIN.password);
+  // Keyed on the field ids, not the placeholder. This helper runs in every
+  // spec, and it silently took the whole suite down when the login page was
+  // rebuilt and the placeholder changed from "you@company.com" to
+  // "you@srfpowermachine.com" — a copy edit should never be able to do that.
+  // The password field's `type` flips to "text" behind the show/hide toggle,
+  // so that is not a safe selector either.
+  await page.locator("#email").fill(ADMIN.email);
+  await page.locator("#password").fill(ADMIN.password);
   await page.getByRole("button", { name: /sign in|log in|login/i }).click();
   await page.waitForURL(/\/dashboard/, { timeout: 30_000 });
 }

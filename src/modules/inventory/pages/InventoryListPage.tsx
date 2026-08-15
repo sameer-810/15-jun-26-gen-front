@@ -114,6 +114,7 @@ export function InventoryListPage() {
         newButtonText="New Model"
         searchPlaceholder="Search by model or brand..."
         minTableWidth="min-w-[1200px]"
+        rowOpensEditor
         emptyText="No inventory yet. Add your first generator model."
         deleteConfirmText="Delete this model from inventory? Sale history is retained."
         hideCreateButton={!canManage}

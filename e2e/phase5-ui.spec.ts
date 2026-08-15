@@ -189,9 +189,14 @@ test.describe("Point 8 — Received first, with a date window", () => {
     await page.goto("/leads");
     await waitForTable(page);
 
-    const headers = (await page.locator("table thead th").allInnerTexts()).map((h) => h.trim());
-    // Column 1 is the selection checkbox, 2 is Actions, so Received is 3rd.
-    expect(headers[2]).toBe("Received");
+    const headers = (await page.locator("table thead th").allInnerTexts()).map((h) =>
+      // Headers are uppercased in CSS and innerText reflects text-transform, so
+      // compare on the underlying label rather than the rendered casing.
+      h.trim().toLowerCase(),
+    );
+    // Column 1 is the selection checkbox. Actions used to sit at index 1 and now
+    // sits last, so Received — the anchor column — really is the first data one.
+    expect(headers[1]).toBe("received");
 
     await page.getByPlaceholder("Customer, mobile, city, requirement...").fill(RUN_TAG);
     await waitForTable(page);

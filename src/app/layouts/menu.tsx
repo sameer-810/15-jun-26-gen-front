@@ -12,6 +12,8 @@ import {
   Activity,
   Settings,
   Users,
+  UserRound,
+  CalendarCheck,
 } from "lucide-react";
 import type { Role } from "@/modules/auth/authSlice";
 
@@ -81,6 +83,14 @@ const SECTIONS: MenuSection[] = [
     ],
   },
   {
+    heading: "My Work",
+    items: [
+      // Every role, including inventory — attendance and pay are not a
+      // permission. The endpoint scopes each person to themselves.
+      { label: "My Performance", to: "/my-performance", icon: UserRound },
+    ],
+  },
+  {
     heading: "Insights",
     items: [
       {
@@ -106,6 +116,12 @@ const SECTIONS: MenuSection[] = [
         to: "/locations",
         icon: MapPin,
         roles: ["admin", "manager", "inventory"],
+      },
+      {
+        label: "Attendance & Targets",
+        to: "/attendance",
+        icon: CalendarCheck,
+        roles: ["admin", "manager"],
       },
       { label: "Settings", to: "/settings", icon: Settings, roles: ["admin"] },
       { label: "Users", to: "/users", icon: Users, roles: ["admin"] },

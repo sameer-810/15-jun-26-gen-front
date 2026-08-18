@@ -157,7 +157,7 @@ test.describe("Leads list", () => {
 });
 
 test.describe("Point 9 — admin bulk delete in the browser", () => {
-  test("only dead leads offer a checkbox, and deleting clears them", async ({ page }) => {
+  test("a live lead can be selected but not deleted; a dead one can", async ({ page }) => {
     const dead = await createLead(ctx, {
       customerName: `${RUN_TAG} uidead`,
       status: "not_interested",
@@ -172,13 +172,27 @@ test.describe("Point 9 — admin bulk delete in the browser", () => {
     await page.getByPlaceholder("Customer, mobile, city, requirement...").fill(RUN_TAG);
     await waitForTable(page);
 
-    // The live lead has no checkbox; the dead one does.
-    await expect(page.getByTestId(`select-row-${alive.id}`)).toHaveCount(0);
+    /*
+      Every lead is now selectable, because bulk *assignment* (SRS 3.2) applies
+      to live pipeline — restricting the checkbox to dead leads would make the
+      assignment engine unusable. The protection moved rather than disappearing:
+      Delete is disabled unless the selection actually contains a deletable lead,
+      which is also what the server enforces.
+    */
+    const aliveBox = page.getByTestId(`select-row-${alive.id}`);
     const deadBox = page.getByTestId(`select-row-${dead.id}`);
+    await expect(aliveBox).toBeVisible();
     await expect(deadBox).toBeVisible();
 
-    await deadBox.check();
     const bar = page.getByTestId("bulk-action-bar");
+
+    // A live-only selection: assignable, not deletable.
+    await aliveBox.check();
+    await expect(bar).toBeVisible();
+    await expect(bar.getByRole("button", { name: "Delete selected" })).toBeDisabled();
+    await aliveBox.uncheck();
+
+    await deadBox.check();
     await expect(bar).toBeVisible();
     await expect(bar).toContainText("1 selected");
 

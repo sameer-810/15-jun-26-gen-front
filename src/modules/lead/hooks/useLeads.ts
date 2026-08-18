@@ -6,6 +6,7 @@ import {
   updateLead,
   deleteLead,
   bulkDeleteLeads,
+  bulkAssignLeads,
   addFollowUp,
   getDueFollowUps,
   getAssignableUsers,
@@ -33,6 +34,21 @@ export function useBulkDeleteLeads() {
     mutationFn: (ids: string[]) => bulkDeleteLeads(ids),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads", "list"] });
+      qc.invalidateQueries({ queryKey: ["leads", "due"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function useBulkAssignLeads() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, assignedTo }: { ids: string[]; assignedTo: string | null }) =>
+      bulkAssignLeads(ids, assignedTo),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads", "list"] });
+      // Reassignment changes whose follow-ups these are, so the reminders panel
+      // and the dashboard counters are stale too.
       qc.invalidateQueries({ queryKey: ["leads", "due"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
     },

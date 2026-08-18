@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Pencil,
@@ -11,6 +11,7 @@ import {
   Mail,
   Phone,
   Upload,
+  UserPlus,
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { LeadDialog } from "../components/LeadDialog";
@@ -23,7 +24,13 @@ import { LeadCitySelect } from "../components/LeadCitySelect";
 import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
 import { useLogCall } from "../hooks/useLeadWorkspace";
 import type { MessageChannel } from "@/modules/messaging/types";
-import { useLeads, useDeleteLead, useBulkDeleteLeads } from "../hooks/useLeads";
+import {
+  useLeads,
+  useDeleteLead,
+  useBulkDeleteLeads,
+  useBulkAssignLeads,
+  useAssignableUsers,
+} from "../hooks/useLeads";
 import {
   LEAD_STATUS_LABELS,
   LEAD_STATUS_COLORS,
@@ -32,12 +39,14 @@ import {
   LEAD_SOURCES,
   BULK_DELETABLE_LEAD_STATUSES,
   LABEL_COLOR_CLASSES,
+  CALL_OUTCOMES,
+  CALL_OUTCOME_LABELS,
 } from "../constants/lead.constants";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import type { Lead, LeadListQuery, LeadStatus, LeadSource } from "../types";
+import type { Lead, LeadListQuery, LeadStatus, LeadSource, CallFilter } from "../types";
 import type { QuotationPrefill } from "@/modules/quotation/types";
 
 const filterSelectCls =
@@ -69,6 +78,9 @@ function leadToQuotationPrefill(lead: Lead): QuotationPrefill {
 export function LeadListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canDelete = role === "admin";
+  // Distributing leads across the team is a sales-manager job, so managers get
+  // it too. Matches the guard on POST /leads/bulk-assign.
+  const canAssign = role === "admin" || role === "manager";
   const [status, setStatus] = useState<LeadStatus | "">("");
   const [source, setSource] = useState<LeadSource | "">("");
   const [location, setLocation] = useState("");
@@ -89,10 +101,60 @@ export function LeadListPage() {
   const [sendTo, setSendTo] = useState<{ lead: Lead; channel: MessageChannel } | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  // Answered / unanswered toggle (SRS 3.2). "" is all leads.
+  const [callFilter, setCallFilter] = useState<CallFilter | "">("");
   const logCall = useLogCall();
+  // The lead we are waiting on a call outcome for. See the call button below.
+  const [callOutcomeFor, setCallOutcomeFor] = useState<Lead | null>(null);
+
+  /**
+   * Record the attempt. `outcome` is undefined when the user dismisses the
+   * prompt — the call still happened and still belongs in the history, we just
+   * do not know how it went. The backend already treats outcome as optional,
+   * so "attempted, result unknown" is a state the data can represent honestly
+   * instead of being rounded up to "connected".
+   */
+  async function recordCall(outcome?: string) {
+    const lead = callOutcomeFor;
+    if (!lead) return;
+    setCallOutcomeFor(null);
+    try {
+      await logCall.mutateAsync({ leadId: lead.id, outcome: outcome as never });
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
 
   const bulkDelete = useBulkDeleteLeads();
   const [confirmBulk, setConfirmBulk] = useState<{ ids: string[]; clear: () => void } | null>(null);
+
+  const bulkAssign = useBulkAssignLeads();
+  const [assignBulk, setAssignBulk] = useState<{ ids: string[]; clear: () => void } | null>(null);
+  const [assignTo, setAssignTo] = useState("");
+  // Only fetched once the dialog is open — this is a rarely used control and
+  // the list is otherwise dead weight on every leads page load.
+  const assignableUsers = useAssignableUsers(Boolean(assignBulk));
+
+  async function runBulkAssign() {
+    if (!assignBulk) return;
+    try {
+      const res = await bulkAssign.mutateAsync({
+        ids: assignBulk.ids,
+        // "" is the un-assign option in the select; the API wants null.
+        assignedTo: assignTo || null,
+      });
+      toast.success(
+        res.assignedTo
+          ? `${res.updated} lead(s) assigned to ${res.assignedTo}`
+          : `${res.updated} lead(s) returned to the pool`,
+      );
+      assignBulk.clear();
+      setAssignBulk(null);
+      setAssignTo("");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
 
   async function runBulkDelete() {
     if (!confirmBulk) return;
@@ -111,10 +173,6 @@ export function LeadListPage() {
   }
 
   // Only dead leads may be bulk-cleared, matching the server-side allowlist.
-  const isRowSelectable = useCallback(
-    (lead: Lead) => BULK_DELETABLE_LEAD_STATUSES.includes(lead.status),
-    [],
-  );
 
   return (
     <>
@@ -169,6 +227,36 @@ export function LeadListPage() {
                   {l.customerName}
                 </Link>
                 <div className="text-xs text-muted-foreground">{l.mobile || "-"}</div>
+                {/*
+                  "The lead view must clearly display which employee initiated
+                  the action" (SRS 3.2). Shown here rather than in its own
+                  column because it is only meaningful next to the customer it
+                  refers to, and the table is already 1500px wide.
+                */}
+                {l.lastCallByName && (
+                  <div className="mt-0.5 text-xs">
+                    <span
+                      className={
+                        l.lastCallOutcome === "connected"
+                          ? "text-success"
+                          : l.lastCallOutcome
+                            ? "text-warning"
+                            : "text-muted-foreground"
+                      }
+                    >
+                      {l.lastCallOutcome
+                        ? CALL_OUTCOME_LABELS[l.lastCallOutcome]
+                        : "Called, outcome not recorded"}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" · "}
+                      {l.lastCallByName}
+                      {l.callCount && l.callCount > 1 ? (
+                        <span className="font-mono tabular-nums"> ({l.callCount})</span>
+                      ) : null}
+                    </span>
+                  </div>
+                )}
                 {l.labels?.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {l.labels.map((lb) => (
@@ -253,25 +341,59 @@ export function LeadListPage() {
           maxQuantity: toQty(maxQty),
           startDate: startDate || undefined,
           endDate: endDate || undefined,
+          callFilter: callFilter || undefined,
           page,
           limit,
         })}
-        isRowSelectable={canDelete ? isRowSelectable : undefined}
+        /*
+          Selection used to be admin-only and limited to dead leads, because
+          delete was the only bulk action. Assignment (SRS 3.2) applies to live
+          leads and is a sales-manager job, so any lead is now selectable and
+          each action decides its own eligibility from the selection.
+        */
+        isRowSelectable={canAssign || canDelete ? () => true : undefined}
         renderBulkActions={
-          canDelete
-            ? ({ ids, clear }) => (
-                <button
-                  onClick={() => setConfirmBulk({ ids, clear })}
-                  disabled={bulkDelete.isPending}
-                  className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete selected
-                </button>
-              )
+          canAssign || canDelete
+            ? ({ ids, items, clear }) => {
+                // The server refuses anything that isn't already dead, so
+                // offering Delete on a live selection would only produce a
+                // "0 deleted, 12 skipped" toast. Say why up front instead.
+                const deletable = items.filter((l) =>
+                  BULK_DELETABLE_LEAD_STATUSES.includes(l.status),
+                );
+                return (
+                  <>
+                    {canAssign && (
+                      <button
+                        data-testid="bulk-assign-open"
+                        onClick={() => setAssignBulk({ ids, clear })}
+                        disabled={bulkAssign.isPending}
+                        className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" /> Assign to…
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => setConfirmBulk({ ids, clear })}
+                        disabled={bulkDelete.isPending || deletable.length === 0}
+                        title={
+                          deletable.length === 0
+                            ? "Only leads marked Not Interested or Irrelevant can be deleted"
+                            : `${deletable.length} of ${items.length} can be deleted`
+                        }
+                        className="flex items-center gap-1.5 rounded-lg border border-destructive/30 px-3 py-1.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete selected
+                      </button>
+                    )}
+                  </>
+                );
+              }
             : undefined
         }
         renderFilters={({ search, setSearch }) => (
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-wrap items-end gap-3">
+          <div className="pg-tile flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[220px]">
               <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
               <input
@@ -280,6 +402,41 @@ export function LeadListPage() {
                 placeholder="Customer, mobile, city, requirement..."
                 className={filterInputCls}
               />
+            </div>
+
+            {/*
+              Calling filter — SRS 3.2. A segmented control rather than a select
+              because these four are the whole vocabulary and a salesperson
+              flips between them constantly; a dropdown costs two clicks each
+              time to show four options.
+            */}
+            <div>
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Calls</span>
+              <div className="inline-flex overflow-hidden rounded-lg border border-input">
+                {(
+                  [
+                    { key: "", label: "All" },
+                    { key: "answered", label: "Answered" },
+                    { key: "unanswered", label: "Unanswered" },
+                    { key: "not_called", label: "Not called" },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.key || "all"}
+                    type="button"
+                    data-testid={`call-filter-${opt.key || "all"}`}
+                    aria-pressed={callFilter === opt.key}
+                    onClick={() => setCallFilter(opt.key)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${
+                      callFilter === opt.key
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="min-w-[150px]">
               <label
@@ -428,9 +585,18 @@ export function LeadListPage() {
             <a
               href={lead.mobile ? `tel:${lead.mobile}` : undefined}
               onClick={() => {
-                // Opening the dialler is the call; log it so the engagement
-                // counters and the lead history reflect the attempt.
-                if (lead.mobile) logCall.mutate({ leadId: lead.id, outcome: "connected" });
+                /*
+                  Opening the dialler starts the call; the *result* of it is not
+                  knowable yet, so we ask once the user comes back.
+
+                  This used to fire `logCall({ outcome: "connected" })` right
+                  here, which recorded every attempt as answered whether anyone
+                  picked up or not. That made the answered-vs-unanswered figures
+                  the SRS asks for (3.2) not merely inaccurate but inverted —
+                  they would have read 100% answered forever, and looked
+                  entirely plausible while staff were judged on them.
+                */
+                if (lead.mobile) setCallOutcomeFor(lead);
               }}
               data-testid={`call-${lead.id}`}
               aria-disabled={!lead.mobile}
@@ -528,6 +694,110 @@ export function LeadListPage() {
         leadId={sendTo?.lead.id}
         to={sendTo?.channel === "email" ? sendTo?.lead.email : sendTo?.lead.mobile}
       />
+
+      {/*
+        Call outcome prompt.
+
+        Deliberately unskippable-by-accident but trivially skippable on purpose:
+        "Not sure" records the attempt with no outcome. The one thing it must
+        never do is guess, because everything the SRS asks for in 3.2 — the
+        answered/unanswered filter and the daily report — is built on this
+        single field.
+      */}
+      {callOutcomeFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="pg-overlay w-full max-w-sm p-6" role="dialog" aria-modal="true">
+            <h3 className="text-base font-semibold text-foreground">How did the call go?</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              {callOutcomeFor.customerName}
+              {callOutcomeFor.mobile ? (
+                <span className="font-mono tabular-nums"> · {callOutcomeFor.mobile}</span>
+              ) : null}
+            </p>
+            <div className="mt-4 grid gap-1.5">
+              {CALL_OUTCOMES.map((o) => (
+                <button
+                  key={o}
+                  data-testid={`call-outcome-${o}`}
+                  onClick={() => recordCall(o)}
+                  disabled={logCall.isPending}
+                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-primary hover:bg-accent disabled:opacity-50"
+                >
+                  {CALL_OUTCOME_LABELS[o]}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                data-testid="call-outcome-unknown"
+                onClick={() => recordCall(undefined)}
+                disabled={logCall.isPending}
+                className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+              >
+                Not sure — just log the attempt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk assignment — SRS 3.2. */}
+      {assignBulk && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="pg-overlay w-full max-w-sm p-6" role="dialog" aria-modal="true">
+            <h3 className="text-base font-semibold text-foreground">Assign Leads</h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Reassign <span className="font-mono tabular-nums">{assignBulk.ids.length}</span>{" "}
+              selected lead
+              {assignBulk.ids.length === 1 ? "" : "s"}. The current owner is replaced.
+            </p>
+
+            <label
+              htmlFor="bulk-assign-to"
+              className="mt-4 mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Assign to
+            </label>
+            <select
+              id="bulk-assign-to"
+              data-testid="bulk-assign-select"
+              value={assignTo}
+              onChange={(e) => setAssignTo(e.target.value)}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="">Nobody — return to the pool</option>
+              {(assignableUsers.data ?? []).map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+            {assignableUsers.isLoading && (
+              <p className="mt-1.5 text-xs text-muted-foreground">Loading team…</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setAssignBulk(null);
+                  setAssignTo("");
+                }}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                data-testid="bulk-assign-confirm"
+                onClick={runBulkAssign}
+                disabled={bulkAssign.isPending}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              >
+                {bulkAssign.isPending ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmBulk && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

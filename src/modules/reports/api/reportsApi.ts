@@ -1,6 +1,6 @@
 import { http } from "@/shared/api/http";
 
-export type ReportName = "sales" | "leads" | "inventory" | "follow-ups";
+export type ReportName = "sales" | "leads" | "inventory" | "follow-ups" | "call-activity";
 
 export type ReportResult = {
   rows: Array<Record<string, string | number>>;

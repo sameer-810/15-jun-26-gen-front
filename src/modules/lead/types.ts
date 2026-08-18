@@ -56,11 +56,32 @@ export type Lead = {
   createdBy: UserRef;
   nextFollowUpDate?: string;
   followUps: FollowUp[];
+  /** Calling record (SRS 3.2) — denormalised from the activity log. */
+  lastCallOutcome?:
+    | "connected"
+    | "no_answer"
+    | "busy"
+    | "wrong_number"
+    | "callback_requested"
+    | null;
+  lastCallAt?: string | null;
+  lastCallByName?: string | null;
+  callCount?: number;
   convertedAt?: string;
   saleId?: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * The answered/unanswered toggle (SRS 3.2).
+ *
+ * `not_called` is a third bucket, not an absence of filter. A lead nobody has
+ * rung and a lead that rang out mean opposite things to a salesperson — one is
+ * work not started, the other is work that failed — so collapsing them would
+ * bury the untouched leads inside a list read as "tried and failed".
+ */
+export type CallFilter = "answered" | "unanswered" | "not_called";
 
 export type LeadListQuery = {
   search?: string;
@@ -71,6 +92,7 @@ export type LeadListQuery = {
   location?: string;
   minQuantity?: number;
   maxQuantity?: number;
+  callFilter?: CallFilter;
   page: number;
   limit: number;
 };

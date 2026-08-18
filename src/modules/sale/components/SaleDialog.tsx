@@ -28,6 +28,16 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
   const [customerMobile, setCustomerMobile] = useState("");
   const [saleDate, setSaleDate] = useState("");
   const [location, setLocation] = useState("");
+  /*
+    How this sale is billed (SRS 3.3).
+
+    Defaulted to "gst" because that is the overwhelming majority for a
+    registered business, and an unanswered radio produces `unclassified` rows
+    that someone has to clean up later. It is still an explicit choice on the
+    form rather than a hidden default — the whole reason this field exists is
+    that inferring it was unreliable.
+  */
+  const [gstTreatment, setGstTreatment] = useState<"gst" | "non_gst">("gst");
 
   useEffect(() => {
     if (open) {
@@ -38,6 +48,7 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
       setCustomerMobile("");
       setSaleDate("");
       setLocation("");
+      setGstTreatment("gst");
     }
   }, [open]);
 
@@ -71,6 +82,7 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
         customerMobile: customerMobile.trim() || undefined,
         saleDate: saleDate || undefined,
         location: location.trim() || undefined,
+        gstTreatment,
       });
       toast.success("Sale recorded; stock updated");
       onOpenChange(false);
@@ -179,6 +191,26 @@ export function SaleDialog({ open, onOpenChange, onSuccess }: Props) {
             value={location}
             onChange={setLocation}
           />
+        </div>
+        <div>
+          <label
+            className="block text-xs font-medium text-muted-foreground mb-1"
+            htmlFor="sale-gst-treatment"
+          >
+            Billing
+          </label>
+          {/* SRS 3.3 — recorded here because it cannot be reliably inferred
+              later; see the note on the Sale model. */}
+          <select
+            id="sale-gst-treatment"
+            data-testid="sale-gst-treatment"
+            className={inputCls}
+            value={gstTreatment}
+            onChange={(e) => setGstTreatment(e.target.value as "gst" | "non_gst")}
+          >
+            <option value="gst">With GST</option>
+            <option value="non_gst">Without GST</option>
+          </select>
         </div>
         <div className="flex items-end">
           <div className="w-full rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">

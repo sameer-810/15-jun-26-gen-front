@@ -16,6 +16,14 @@ const SettingsPage = lazy(() =>
 const UsersPage = lazy(() =>
   import("./modules/users/pages/UsersPage").then((m) => ({ default: m.UsersPage })),
 );
+const MyPerformancePage = lazy(() =>
+  import("./modules/hr/pages/MyPerformancePage").then((m) => ({ default: m.MyPerformancePage })),
+);
+const AttendanceAdminPage = lazy(() =>
+  import("./modules/hr/pages/AttendanceAdminPage").then((m) => ({
+    default: m.AttendanceAdminPage,
+  })),
+);
 const LeadListPage = lazy(() =>
   import("./modules/lead/pages/LeadListPage").then((m) => ({ default: m.LeadListPage })),
 );
@@ -87,6 +95,9 @@ export default function App() {
           <Route path="quotations" element={<QuotationListPage />} />
           <Route path="activity" element={<ActivityFeedPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          {/* SRS 3.5 — every role has this; the server scopes it to them. */}
+          <Route path="my-performance" element={<MyPerformancePage />} />
+          <Route path="attendance" element={<AttendanceAdminPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>

@@ -28,6 +28,15 @@ type FormValues = {
   bankAccountNumber: string;
   bankIfsc: string;
   closingLines: string;
+  quotationPrefix: string;
+  nextQuotationNumber: number;
+  proformaPrefix: string;
+  nextProformaNumber: number;
+  invoicePrefix: string;
+  nextInvoiceNumber: number;
+  chatDensity: "comfortable" | "compact";
+  chatAccentOutgoing: boolean;
+  chatShowTimestamps: boolean;
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -35,6 +44,72 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       {children}
+    </div>
+  );
+}
+
+/**
+ * One document series: prefix, next number, and what the next document will
+ * actually be called.
+ *
+ * The preview is the point of this component. "nextQuotationNumber = 1001" is
+ * not something anyone can check at a glance; `QTN-1001` is, and it catches the
+ * two mistakes people make here — a prefix that reads wrong, and a counter set
+ * below numbers already issued.
+ */
+function SeriesRow({
+  title,
+  prefix,
+  next,
+  fy,
+  note,
+  prefixInput,
+  numberInput,
+}: {
+  title: string;
+  prefix?: string;
+  next?: number;
+  fy?: string;
+  note?: string;
+  prefixInput: React.ReactNode;
+  numberInput: React.ReactNode;
+}) {
+  const cleanPrefix = (prefix || "").trim().toUpperCase();
+  const num = Number(next);
+  // Tax invoices carry the financial year between prefix and number; the
+  // internal series do not. Mirrors nextDocNumber() on the server.
+  const preview = !cleanPrefix
+    ? "—"
+    : fy
+      ? `${cleanPrefix}/${fy}/${String(Number.isFinite(num) ? num : 1).padStart(4, "0")}`
+      : `${cleanPrefix}-${Number.isFinite(num) ? num : 1}`;
+
+  return (
+    <div className="rounded-lg border border-border p-3">
+      <div className="grid gap-3 sm:grid-cols-[1fr_7rem_9rem] sm:items-end">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            {title} prefix
+          </label>
+          {prefixInput}
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Next no.</label>
+          {numberInput}
+        </div>
+        <div className="min-w-0">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Next will be</span>
+          <span className="block truncate font-mono text-sm font-medium tabular-nums text-foreground">
+            {preview}
+          </span>
+        </div>
+      </div>
+      {fy && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Current financial year <span className="font-mono tabular-nums">{fy}</span>
+        </p>
+      )}
+      {note && <p className="mt-1 text-xs text-muted-foreground">{note}</p>}
     </div>
   );
 }
@@ -71,6 +146,15 @@ export function SettingsPage() {
         bankAccountNumber: data.bankAccountNumber ?? "",
         bankIfsc: data.bankIfsc ?? "",
         closingLines: (data.closingLines ?? []).join("\n"),
+        quotationPrefix: data.quotationPrefix ?? "QTN",
+        nextQuotationNumber: data.nextQuotationNumber ?? 1001,
+        proformaPrefix: data.proformaPrefix ?? "PI",
+        nextProformaNumber: data.nextProformaNumber ?? 5001,
+        invoicePrefix: data.invoicePrefix ?? "INV",
+        nextInvoiceNumber: data.nextInvoiceNumber ?? 1,
+        chatDensity: data.chatDensity ?? "comfortable",
+        chatAccentOutgoing: data.chatAccentOutgoing ?? true,
+        chatShowTimestamps: data.chatShowTimestamps ?? true,
       });
       // Letterhead artwork is picked, not typed, so it lives outside the form.
       setArt({
@@ -90,6 +174,9 @@ export function SettingsPage() {
         defaultCgstRate: Number(values.defaultCgstRate),
         defaultSgstRate: Number(values.defaultSgstRate),
         defaultIgstRate: Number(values.defaultIgstRate),
+        nextQuotationNumber: Number(values.nextQuotationNumber),
+        nextProformaNumber: Number(values.nextProformaNumber),
+        nextInvoiceNumber: Number(values.nextInvoiceNumber),
         mobileNumbers: values.mobileNumbers
           .split(",")
           .map((s) => s.trim())
@@ -192,6 +279,157 @@ export function SettingsPage() {
               />
             </Field>
           </div>
+        </section>
+
+        {/*
+          Document numbering — SRS 3.3.
+
+          Each series is a prefix plus the next number to be issued, shown
+          together with a live preview so the effect of an edit is visible
+          before saving rather than discovered on the next quotation.
+
+          The tax-invoice number is treated differently on purpose: it must be
+          sequential and gapless within a financial year for GSTR-1, so the
+          counter resets automatically each year and the current FY is shown
+          read-only. Editing the next number is still allowed — a business
+          migrating from another system needs to continue its existing run —
+          but it is the one field here that can create a compliance problem, so
+          it says so.
+        */}
+        <section className="pg-tile space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Document Numbering</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              The series used for quotations, proforma invoices and tax invoices.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <SeriesRow
+              title="Quotation"
+              prefix={form.watch("quotationPrefix")}
+              next={form.watch("nextQuotationNumber")}
+              prefixInput={
+                <input
+                  className={`${inputCls} font-mono uppercase`}
+                  maxLength={10}
+                  aria-label="Quotation prefix"
+                  {...form.register("quotationPrefix")}
+                />
+              }
+              numberInput={
+                <input
+                  type="number"
+                  min={1}
+                  className={`${inputCls} no-spinner font-mono tabular-nums`}
+                  aria-label="Next quotation number"
+                  {...form.register("nextQuotationNumber")}
+                />
+              }
+            />
+
+            <SeriesRow
+              title="Proforma Invoice"
+              prefix={form.watch("proformaPrefix")}
+              next={form.watch("nextProformaNumber")}
+              prefixInput={
+                <input
+                  className={`${inputCls} font-mono uppercase`}
+                  maxLength={10}
+                  aria-label="Proforma prefix"
+                  {...form.register("proformaPrefix")}
+                />
+              }
+              numberInput={
+                <input
+                  type="number"
+                  min={1}
+                  className={`${inputCls} no-spinner font-mono tabular-nums`}
+                  aria-label="Next proforma number"
+                  {...form.register("nextProformaNumber")}
+                />
+              }
+            />
+
+            <SeriesRow
+              title="Tax Invoice"
+              prefix={form.watch("invoicePrefix")}
+              next={form.watch("nextInvoiceNumber")}
+              fy={data?.invoiceSeriesFy}
+              note="Resets each financial year, as GST requires. Change the next number only when continuing a series from another system."
+              prefixInput={
+                <input
+                  className={`${inputCls} font-mono uppercase`}
+                  maxLength={10}
+                  aria-label="Tax invoice prefix"
+                  {...form.register("invoicePrefix")}
+                />
+              }
+              numberInput={
+                <input
+                  type="number"
+                  min={1}
+                  className={`${inputCls} no-spinner font-mono tabular-nums`}
+                  aria-label="Next tax invoice number"
+                  {...form.register("nextInvoiceNumber")}
+                />
+              }
+            />
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Prefixes take letters, numbers, hyphen and underscore — no spaces or slashes, which
+            would clash with the separator in the invoice format.
+          </p>
+        </section>
+
+        {/*
+          Message appearance — SRS 3.4, "customizable dialogue boxes".
+
+          Three business-wide switches rather than per-user theming. The
+          requirement is one sentence with no example, and the product was
+          rejected earlier for looking inconsistent; letting each user restyle
+          their own dialogs would rebuild that. These give the client real
+          control at the level where the interface stays coherent.
+        */}
+        <section className="pg-tile space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Message Appearance</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              How WhatsApp and email conversations are shown to your team.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Density">
+              <select className={inputCls} {...form.register("chatDensity")}>
+                <option value="comfortable">Comfortable</option>
+                <option value="compact">Compact — more messages on screen</option>
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 pt-5 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-primary"
+                {...form.register("chatAccentOutgoing")}
+              />
+              Brand colour on sent messages
+            </label>
+            <label className="flex items-center gap-2 pt-5 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-primary"
+                {...form.register("chatShowTimestamps")}
+              />
+              Show timestamps
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Pre-written replies your team can insert into a conversation are managed on the{" "}
+            <a href="/templates" className="text-primary hover:underline">
+              Templates
+            </a>{" "}
+            screen.
+          </p>
         </section>
 
         <section className="rounded-xl border border-border bg-card p-5 shadow-sm space-y-4">

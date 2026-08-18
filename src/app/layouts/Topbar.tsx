@@ -7,6 +7,7 @@ import { useTheme } from "@/app/theme";
 import { useSidebar } from "./sidebarContext";
 import { Breadcrumbs } from "./Breadcrumbs";
 import { CommandPalette } from "./CommandPalette";
+import { PunchButton } from "@/modules/hr/components/PunchButton";
 import { cn } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -88,6 +89,11 @@ export function Topbar() {
           <Breadcrumbs />
 
           <div className="flex-1" />
+
+          {/* Attendance (SRS 3.1). In the shell because it is the first and last
+              thing anyone touches each day — behind navigation it gets forgotten,
+              and a forgotten logout is the one event that costs an admin work. */}
+          <PunchButton />
 
           <button
             onClick={() => setPaletteOpen(true)}

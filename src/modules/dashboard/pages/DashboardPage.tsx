@@ -13,7 +13,7 @@ import {
   CartesianGrid,
 } from "recharts";
 import { Link } from "react-router-dom";
-import { useDashboard } from "../hooks/useDashboard";
+import { useDashboard, useSalesAnalytics } from "../hooks/useDashboard";
 import { RemindersPanel } from "@/modules/lead/components/RemindersPanel";
 import { useAppSelector } from "@/app/hooks";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -24,6 +24,12 @@ import type { LeadStatus } from "@/modules/lead/types";
 
 const AMBER = "#F5A623";
 const GREEN = "#16A34A";
+// GST split (SRS 3.3). Cobalt for GST because it is the primary, compliant
+// path; a desaturated teal for non-GST so the two are distinguishable without
+// either reading as an alarm; grey for what nobody has classified yet.
+const GST_COLOR = "#1C50C8";
+const NON_GST_COLOR = "#0D9488";
+const UNCLASSIFIED_COLOR = "#94A3B8";
 const STATUS_COLORS: Record<string, string> = {
   new: "#3B82F6",
   important: "#F97316",
@@ -114,6 +120,113 @@ function PipelineFunnel({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Revenue split by how it was billed — SRS 3.3.
+ *
+ * Stacked bars rather than two side-by-side series: the question this answers
+ * is "how much of our revenue goes through GST", which is a composition, and
+ * composition reads off a stack far faster than off two bars you have to add up
+ * yourself. Total height stays comparable month to month either way.
+ *
+ * `unclassified` gets its own grey band. Those are sales recorded before the
+ * treatment field existed; folding them into either side would quietly
+ * misstate the split, and showing them is what prompts someone to fix them.
+ */
+function GstRevenueChart() {
+  const { data, isLoading } = useSalesAnalytics(12);
+
+  if (isLoading) {
+    return <div className="h-72 animate-pulse rounded-lg border border-border" />;
+  }
+  if (!data || data.totals.total === 0) {
+    return (
+      <div className="pg-tile">
+        <h2 className="text-sm font-semibold text-foreground">Revenue — GST vs Non-GST</h2>
+        <EmptyChart label="No sales recorded in the last 12 months" />
+      </div>
+    );
+  }
+
+  const gstShare = Math.round((data.totals.gst / data.totals.total) * 100);
+
+  return (
+    <div className="pg-tile">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-foreground">Revenue — GST vs Non-GST</h2>
+          <p className="text-xs text-muted-foreground">Last 12 months</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          <span className="font-mono font-medium tabular-nums text-foreground">{gstShare}%</span>{" "}
+          billed under GST
+        </p>
+      </div>
+
+      {data.unclassifiedCount > 0 && (
+        <p className="mb-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
+          <span className="font-mono font-medium tabular-nums">{data.unclassifiedCount}</span> sale
+          {data.unclassifiedCount === 1 ? " has" : "s have"} no GST treatment recorded and are shown
+          separately. Set it on each sale to fold them into the split.
+        </p>
+      )}
+
+      <div className="h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data.series} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              width={64}
+              tickFormatter={(v: number) =>
+                v >= 10000000
+                  ? `${(v / 10000000).toFixed(1)}Cr`
+                  : v >= 100000
+                    ? `${(v / 100000).toFixed(1)}L`
+                    : String(v)
+              }
+            />
+            <Tooltip
+              cursor={{ fill: "hsl(var(--accent) / 0.10)" }}
+              contentStyle={{
+                background: "hsl(var(--card))",
+                border: "1px solid hsl(var(--border))",
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              formatter={(value: unknown, name: unknown) => [
+                formatCurrency(value as number),
+                name === "gst" ? "GST" : name === "non_gst" ? "Non-GST" : "Not classified",
+              ]}
+            />
+            <Legend
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(v) =>
+                v === "gst" ? "GST" : v === "non_gst" ? "Non-GST" : "Not classified"
+              }
+            />
+            <Bar dataKey="gst" stackId="rev" fill={GST_COLOR} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="non_gst" stackId="rev" fill={NON_GST_COLOR} radius={[0, 0, 0, 0]} />
+            <Bar
+              dataKey="unclassified"
+              stackId="rev"
+              fill={UNCLASSIFIED_COLOR}
+              radius={[4, 4, 0, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -423,6 +536,9 @@ export function DashboardPage() {
           )}
         </ChartCard>
       </div>
+
+      {/* GST vs Non-GST revenue — SRS 3.3. */}
+      <GstRevenueChart />
 
       {/* My reminders — set from the Manage Lead panel, surfaced here. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">

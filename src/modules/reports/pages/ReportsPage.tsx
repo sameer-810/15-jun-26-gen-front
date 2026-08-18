@@ -13,6 +13,9 @@ const ALL_TABS: { key: ReportName; label: string; roles: string[] }[] = [
   { key: "leads", label: "Leads", roles: ["admin", "manager", "sales"] },
   { key: "follow-ups", label: "Follow-ups", roles: ["admin", "manager", "sales"] },
   { key: "inventory", label: "Inventory", roles: ["admin", "manager", "inventory"] },
+  // SRS 3.2 — daily answered vs unanswered per employee. A sales exec may open
+  // it; the server narrows the rows to their own calls.
+  { key: "call-activity", label: "Call Activity", roles: ["admin", "manager", "sales"] },
 ];
 
 const inputCls =

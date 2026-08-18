@@ -16,6 +16,7 @@ import {
   Mail as MailIcon,
 } from "lucide-react";
 import { useLeadWorkspace, useLogCall } from "../hooks/useLeadWorkspace";
+import { useChatAppearance } from "@/modules/settings/hooks/useSettings";
 import { ManageLeadDialog } from "../components/ManageLeadDialog";
 import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
 import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog";
@@ -89,6 +90,12 @@ export function LeadDetailPage() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useLeadWorkspace(id);
   const logCall = useLogCall();
+  // Conversation appearance (SRS 3.4). Falls back to the defaults while the
+  // query is in flight so the timeline never renders unstyled.
+  const { data: appearance } = useChatAppearance();
+  const chatDensity = appearance?.chatDensity ?? "comfortable";
+  const chatAccentOutgoing = appearance?.chatAccentOutgoing ?? true;
+  const chatShowTimestamps = appearance?.chatShowTimestamps ?? true;
 
   const [tab, setTab] = useState<Tab>("Overview");
   const [manageOpen, setManageOpen] = useState(false);
@@ -378,27 +385,54 @@ export function LeadDetailPage() {
               Nothing recorded for this lead yet.
             </p>
           ) : (
+            /*
+              Conversation appearance (SRS 3.4) is applied here. This timeline
+              *is* the chat box in this product — there is no separate thread
+              view — so the business-wide density, accent and timestamp settings
+              are what they control.
+            */
             <ol
-              className="relative space-y-4 border-l border-border pl-6"
+              className={`relative border-l border-border pl-6 ${
+                chatDensity === "compact" ? "space-y-2" : "space-y-4"
+              }`}
               data-testid="lead-history"
             >
               {timeline.map((a) => {
                 const meta = ACTIVITY_META[a.type];
                 const Icon = meta?.icon ?? MessageSquare;
+                // Messages we sent are the ones the accent applies to; received
+                // replies and system events stay neutral.
+                const isOutgoing = a.type === "message_sent";
                 return (
                   <li key={a.id} className="relative">
-                    <span className="absolute -left-[31px] flex h-5 w-5 items-center justify-center rounded-full border border-border bg-card">
-                      <Icon className={`h-3 w-3 ${meta?.color ?? "text-muted-foreground"}`} />
+                    <span
+                      className={`absolute -left-[31px] flex h-5 w-5 items-center justify-center rounded-full border bg-card ${
+                        isOutgoing && chatAccentOutgoing ? "border-primary/50" : "border-border"
+                      }`}
+                    >
+                      <Icon
+                        className={`h-3 w-3 ${
+                          isOutgoing && chatAccentOutgoing
+                            ? "text-primary"
+                            : (meta?.color ?? "text-muted-foreground")
+                        }`}
+                      />
                     </span>
                     <div className="text-sm font-medium text-foreground">{a.action}</div>
                     {a.remarks && (
-                      <div className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
+                      <div
+                        className={`mt-0.5 whitespace-pre-wrap text-xs ${
+                          isOutgoing && chatAccentOutgoing
+                            ? "rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-foreground"
+                            : "text-muted-foreground"
+                        }`}
+                      >
                         {a.remarks}
                       </div>
                     )}
                     <div className="mt-0.5 text-[11px] text-muted-foreground">
-                      {meta?.label ?? a.type} · {a.userName || a.user?.name || "System"} ·{" "}
-                      {formatDateTime(a.createdAt)}
+                      {meta?.label ?? a.type} · {a.userName || a.user?.name || "System"}
+                      {chatShowTimestamps ? ` · ${formatDateTime(a.createdAt)}` : ""}
                     </div>
                   </li>
                 );

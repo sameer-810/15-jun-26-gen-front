@@ -97,7 +97,19 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
    */
   isRowSelectable?: (item: TItem) => boolean;
   /** Bar rendered above the table while at least one row is selected. */
-  renderBulkActions?: (args: { ids: string[]; clear: () => void }) => React.ReactNode;
+  /**
+   * Bar rendered above the table while at least one row is selected.
+   *
+   * Receives the selected `items`, not just their ids, because a bar can carry
+   * actions with different eligibility rules — on leads, anything may be
+   * reassigned but only dead leads may be deleted. Without the items each
+   * action would have to re-derive state it cannot see.
+   */
+  renderBulkActions?: (args: {
+    ids: string[];
+    items: TItem[];
+    clear: () => void;
+  }) => React.ReactNode;
   /**
    * Makes the whole row open the record, the way every mature CRM behaves.
    *
@@ -336,7 +348,11 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             {selected.length} selected on this page
           </span>
           <div className="flex items-center gap-2">
-            {renderBulkActions({ ids: selected, clear: clearSelection })}
+            {renderBulkActions({
+              ids: selected,
+              items: items.filter((i) => selected.includes(i.id)),
+              clear: clearSelection,
+            })}
             <button
               onClick={clearSelection}
               className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"

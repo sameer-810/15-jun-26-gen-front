@@ -22,6 +22,18 @@ export async function bulkDeleteLeads(ids: string[]) {
   return res.data.data;
 }
 
+/**
+ * Reassign the selected leads (SRS 3.2). `assignedTo: null` returns them to the
+ * pool. Admin and manager only — the server enforces this too.
+ */
+export async function bulkAssignLeads(ids: string[], assignedTo: string | null) {
+  const res = await http.post<{
+    data: { updated: number; skipped: number; assignedTo: string | null };
+    message: string;
+  }>("/leads/bulk-assign", { ids, assignedTo });
+  return res.data.data;
+}
+
 export async function addFollowUp(
   id: string,
   payload: { note: string; nextFollowUpDate?: string },

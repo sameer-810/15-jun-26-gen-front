@@ -16,6 +16,7 @@ import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { PageLoader } from "@/shared/components/PageLoader";
+import { Fab } from "@/shared/components/Fab";
 import type { Media } from "@/modules/media/types";
 import type { Template, TemplateKind } from "../types";
 
@@ -132,8 +133,8 @@ export function TemplatesPage() {
   return (
     <div className="erp-page" data-testid="templates-page">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Templates</h1>
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-bold text-foreground md:block">Templates</h1>
           <p className="text-sm text-muted-foreground">
             Reusable descriptions, terms and message bodies
           </p>
@@ -145,34 +146,39 @@ export function TemplatesPage() {
           <Link
             to="/locations"
             data-testid="locations-link"
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
+            aria-label="Location list"
+            title="Location list"
+            className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
           >
-            <MapPin className="h-4 w-4" /> Location list
+            <MapPin className="h-4 w-4" />
+            <span className="hidden md:inline">Location list</span>
           </Link>
           <button
             onClick={() => openEditor(null)}
             data-testid="new-template"
-            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            className="hidden items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:flex"
           >
             <Plus className="h-4 w-4" /> New {TEMPLATE_KIND_LABELS[kind]}
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      {/* One scrolling line on a phone instead of two wrapped rows. */}
+      <div className="pg-chips md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
         {TEMPLATE_KINDS.map((k) => (
           <button
             key={k}
             onClick={() => setKind(k)}
             data-testid={`template-tab-${k}`}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            aria-pressed={kind === k}
+            className={`pg-chip md:rounded-lg md:px-4 ${
               kind === k
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-card hover:bg-accent"
+                ? "md:bg-primary md:text-primary-foreground md:shadow-sm"
+                : "md:border-border md:bg-card md:hover:bg-accent"
             }`}
           >
             {TEMPLATE_KIND_LABELS[k]}
-            <span className="ml-1.5 opacity-70">{countFor(k)}</span>
+            <span className="ml-1.5 font-mono tabular-nums opacity-70">{countFor(k)}</span>
           </button>
         ))}
       </div>
@@ -182,7 +188,7 @@ export function TemplatesPage() {
       {isLoading ? (
         <PageLoader />
       ) : !data?.items.length ? (
-        <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="pg-tile p-10 text-center text-sm text-muted-foreground">
           No {TEMPLATE_KIND_LABELS[kind].toLowerCase()} templates yet.
         </div>
       ) : (
@@ -191,7 +197,7 @@ export function TemplatesPage() {
             <div
               key={t.id}
               data-testid={`template-card-${t.id}`}
-              className="flex flex-col rounded-xl border border-border bg-card p-4 shadow-sm"
+              className="pg-panel flex flex-col p-4"
             >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -245,6 +251,10 @@ export function TemplatesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {canEdit && (
+        <Fab label={`New ${TEMPLATE_KIND_LABELS[kind]}`} onClick={() => openEditor(null)} />
       )}
 
       <FormDialog

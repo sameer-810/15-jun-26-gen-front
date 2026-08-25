@@ -212,3 +212,177 @@ table,
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-muted-foreground/50;
 }
+
+/* ── Mobile ───────────────────────────────────────────────────────────────────
+   The desktop app was competent and the phone build was an afterthought: every
+   list screen was an 800px table inside a 390px window, so the first thing a
+   field engineer saw on /leads was twelve hundred pixels of filter form and a
+   customer name wrapped across three lines.
+
+   What follows is a second layout for the same data, not a re-skin. The rules
+   above still hold — cobalt only where you can act, elevation only where
+   something genuinely floats, mono on every figure. Three things are new,
+   because a phone has constraints a desktop does not:
+
+     · the thumb, which is why navigation moved to the bottom edge;
+     · the notch and the home indicator, hence the safe-area insets;
+     · the 44px finger, which the 26px icon buttons were less than half of.
+─────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Safe areas. A fixed bar at the bottom of an iPhone sits *under* the home
+ * indicator unless it pays for the inset itself, and on Android gesture-nav the
+ * same applies to the pill. `env()` resolves to 0 everywhere else, so this
+ * costs nothing on a device without them.
+ */
+.pg-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pg-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/**
+ * Minimum touch target.
+ *
+ * The row actions were `p-1.5` around a 14px icon — a 26px target, well under
+ * half the area Apple and Google both specify (44px / 48dp). It was fine with a
+ * mouse and genuinely difficult with a thumb, which is why staff reported
+ * "mis-tapping delete". Applied to every interactive control that is icon-only
+ * on mobile; the visual size of the glyph is unchanged, only the hit box grows.
+ */
+.pg-tap {
+  @apply relative;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/**
+ * The bottom tab bar.
+ *
+ * Fixed to the bottom edge because that is the only part of a 6" screen a thumb
+ * reaches without regripping — the hamburger it replaces was in the top-left
+ * corner, the single furthest point from a right thumb. Opaque with a hairline,
+ * for the same reason the top bar is: card rows sliding underneath a translucent
+ * bar read as smears, and it forces a compositing layer on every scroll frame.
+ */
+.pg-bottombar {
+  @apply fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background;
+}
+
+/**
+ * Bottom sheet.
+ *
+ * Mobile's answer to the centred modal. A 666-line quotation form in a
+ * `max-w-lg` box centred in a 390px viewport leaves ~350px of usable width and
+ * puts its Save button in the middle of the screen; the same form as a sheet
+ * gets full width, rises from the edge the thumb is already near, and can be
+ * dismissed by dragging down. It genuinely floats above the page, so unlike an
+ * in-page panel it has earned its shadow.
+ */
+.pg-sheet {
+  @apply flex max-h-[92vh] w-full flex-col rounded-t-2xl border-t border-border bg-popover shadow-2xl;
+}
+
+/**
+ * The grab handle. Purely an affordance: it is what tells someone the sheet can
+ * be dragged away rather than only closed with the X.
+ */
+.pg-sheet-grip {
+  @apply mx-auto my-2.5 h-1 w-9 shrink-0 rounded-full bg-muted-foreground/30;
+}
+
+/**
+ * A record as a card, which is what replaces a table row below `md`.
+ *
+ * A table works by letting the eye run down an aligned column; that mechanism
+ * needs width, and at 390px there is none, so the table degrades into
+ * horizontal panning — the worst of both. A card drops the alignment and keeps
+ * the record intact: everything about one lead in one block, nothing off-screen.
+ * Still a boundary rather than an object, so it keeps the hairline and takes no
+ * elevation.
+ */
+.pg-card {
+  @apply rounded-lg border border-border bg-card p-3.5 transition-colors;
+}
+.pg-card:active {
+  @apply bg-accent/40;
+}
+
+/**
+ * Horizontal chip strip — filter states, record tabs.
+ *
+ * Scrolls rather than wraps. The Calls segmented control wrapped "Not called"
+ * onto a second line at 390px and pushed the list further down the page; a
+ * strip that scrolls sideways costs one gesture and no vertical space. The
+ * scrollbar is hidden because on a touch device it is noise.
+ */
+.pg-chips {
+  @apply -mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.pg-chips::-webkit-scrollbar {
+  display: none;
+}
+.pg-chip {
+  @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors;
+}
+.pg-chip[aria-pressed="true"],
+.pg-chip[data-active="true"] {
+  @apply border-primary bg-primary text-primary-foreground;
+}
+
+/**
+ * Identity disc on a card — initials, standing in for the leftmost "anchor"
+ * column a table would have given us.
+ *
+ * Deliberately `bg-muted` and not a tinted pastel. A coloured disc per record is
+ * the decorative-icon-tile rule in a new costume, and it would spend colour on
+ * ornament in a product where colour means status. The initials alone do the
+ * identifying work.
+ */
+.pg-disc {
+  @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground;
+}
+
+/**
+ * Floating action button — the screen's one primary create action.
+ *
+ * On desktop "New Lead" sits in the header, which on a phone is both off-thumb
+ * and competing with the title, Refresh and Import for a 390px row. As a FAB it
+ * is unambiguous and reachable. Exactly one per screen; a second FAB means the
+ * screen has no primary action and the pattern is wrong for it.
+ */
+.pg-fab {
+  @apply fixed right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-colors;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+.pg-fab:active {
+  @apply bg-primary/90;
+}
+
+/**
+ * Momentum scrolling for the chip strips and any remaining sideways scroller,
+ * and snap-free panning so a half-scrolled strip doesn't fight the finger.
+ */
+@media (hover: none) {
+  .pg-chips,
+  .pg-hscroll {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/**
+ * iOS zooms the page when a focused input's font-size is below 16px, then
+ * leaves it zoomed — which is how a form ends up horizontally scrolled after
+ * one tap. The interface uses 14px (`text-sm`) throughout, so the floor is set
+ * explicitly on the controls themselves rather than by inflating the type.
+ */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

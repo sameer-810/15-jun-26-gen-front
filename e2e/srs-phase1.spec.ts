@@ -119,8 +119,22 @@ test.describe("R5 — bulk lead assignment", () => {
 
     await page.getByTestId("bulk-assign-open").click();
 
-    // Pick the first real person in the list, whoever the seed data gave us.
+    /*
+      Pick the first real person in the list, whoever the seed data gave us.
+
+      The team list is fetched only once this dialog opens — it is a rarely used
+      control, so it is not loaded on every visit to the lead list. That makes
+      the read below a race: `evaluateAll` resolves the moment the `<select>`
+      exists, which it does immediately, carrying only its static "Nobody —
+      return to the pool" option. Waiting for a second option first is what
+      makes this deterministic; without it the test failed roughly one run in
+      two, depending on whether the request beat the assertion.
+    */
     const select = page.getByTestId("bulk-assign-select");
+    await expect
+      .poll(async () => await select.locator("option").count(), { timeout: 15_000 })
+      .toBeGreaterThan(1);
+
     const optionValues = await select
       .locator("option")
       .evaluateAll((els) => els.map((e) => (e as HTMLOptionElement).value).filter(Boolean));

@@ -5,7 +5,9 @@ import { useAssignableUsers } from "@/modules/lead/hooks/useLeads";
 import { PageLoader } from "@/shared/components/PageLoader";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { RecordCard } from "@/shared/components/RecordCard";
 import type { AttendanceDay, AttendanceStatus } from "../api/hrApi";
 
 const STATUS_LABELS: Record<AttendanceStatus, string> = {
@@ -40,6 +42,7 @@ function monthBounds(month: string) {
 export function AttendanceAdminPage() {
   const [month, setMonth] = useState(currentMonth());
   const [userId, setUserId] = useState("");
+  const isMobile = useIsMobile();
   const { from, to } = monthBounds(month);
 
   const staff = useAssignableUsers(true);
@@ -98,11 +101,11 @@ export function AttendanceAdminPage() {
   return (
     <div className="erp-page">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-semibold tracking-tight text-foreground md:block">
             Attendance &amp; Targets
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground md:mt-1">
             {unresolved.length > 0 ? (
               <>
                 <span className="font-mono font-medium tabular-nums text-destructive">
@@ -115,8 +118,11 @@ export function AttendanceAdminPage() {
             )}
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div>
+        {/* Two controls only, so they stay inline on a phone — side by side
+            rather than behind a Filters sheet, which for two selects would be a
+            tap to reach a tap. */}
+        <div className="flex w-full flex-wrap items-end gap-2 md:w-auto">
+          <div className="min-w-0 flex-1 md:flex-none">
             <label
               htmlFor="att-user"
               className="mb-1 block text-xs font-medium text-muted-foreground"
@@ -128,7 +134,7 @@ export function AttendanceAdminPage() {
               data-testid="attendance-user"
               value={userId}
               onChange={(e) => setUserId(e.target.value)}
-              className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
             >
               <option value="">Everyone</option>
               {(staff.data ?? []).map((u) => (
@@ -138,7 +144,7 @@ export function AttendanceAdminPage() {
               ))}
             </select>
           </div>
-          <div>
+          <div className="min-w-0 flex-1 md:flex-none">
             <label
               htmlFor="att-month"
               className="mb-1 block text-xs font-medium text-muted-foreground"
@@ -150,7 +156,7 @@ export function AttendanceAdminPage() {
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
             />
           </div>
         </div>
@@ -191,7 +197,7 @@ export function AttendanceAdminPage() {
         )}
 
         <div className="flex flex-wrap items-end gap-2">
-          <div>
+          <div className="min-w-0 flex-1 md:flex-none">
             <label
               htmlFor="target-metric"
               className="mb-1 block text-xs font-medium text-muted-foreground"
@@ -202,13 +208,13 @@ export function AttendanceAdminPage() {
               id="target-metric"
               value={targetForm.metric}
               onChange={(e) => setTargetForm((f) => ({ ...f, metric: e.target.value }))}
-              className="rounded-lg border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
             >
               <option value="sales_value">Sales value (₹)</option>
               <option value="conversions">Conversions (count)</option>
             </select>
           </div>
-          <div>
+          <div className="min-w-0 flex-1 md:flex-none">
             <label
               htmlFor="target-value"
               className="mb-1 block text-xs font-medium text-muted-foreground"
@@ -222,22 +228,92 @@ export function AttendanceAdminPage() {
               min={0}
               value={targetForm.value}
               onChange={(e) => setTargetForm((f) => ({ ...f, value: e.target.value }))}
-              className="no-spinner w-40 rounded-lg border border-input bg-background px-3 py-1.5 font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+              className="no-spinner h-11 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-40 md:py-1.5"
             />
           </div>
           <button
             data-testid="target-save"
             onClick={submitTarget}
             disabled={setTarget.isPending || !userId}
-            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="pg-tap w-full rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 md:min-h-0 md:w-auto md:py-1.5"
           >
             Set target
           </button>
         </div>
       </div>
 
-      {/* Attendance days. */}
-      <div className="pg-panel max-h-[calc(100vh-20rem)] overflow-auto">
+      {/*
+        Attendance days.
+
+        As a card list below `md`: the six columns are date, name, in, out,
+        worked and status, and at 390px a table of them shows the first two.
+        Times are the point of this screen, so they stay mono and stay together.
+      */}
+      {isMobile && (
+        <div className="space-y-2">
+          {rows.length === 0 ? (
+            <p className="pg-panel px-4 py-12 text-center text-sm text-muted-foreground">
+              No attendance recorded for this period.
+            </p>
+          ) : (
+            rows.map((r) => (
+              <RecordCard
+                key={r.id}
+                title={r.userName}
+                amount={
+                  <span className={r.status === "incomplete" ? "text-destructive" : undefined}>
+                    {r.workedMinutes
+                      ? `${Math.floor(r.workedMinutes / 60)}h ${String(r.workedMinutes % 60).padStart(2, "0")}m`
+                      : "—"}
+                  </span>
+                }
+                meta={[
+                  new Date(r.date).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                  }),
+                  <span className="font-mono tabular-nums">
+                    {r.firstIn
+                      ? new Date(r.firstIn.at).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                    {" → "}
+                    {r.lastOut
+                      ? new Date(r.lastOut.at).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                  </span>,
+                  <span className={r.status === "incomplete" ? "text-destructive" : undefined}>
+                    {STATUS_LABELS[r.status]}
+                  </span>,
+                ]}
+                actions={
+                  r.status === "incomplete" ? (
+                    <button
+                      type="button"
+                      data-testid={`resolve-${r.id}`}
+                      onClick={() => {
+                        setResolving(r);
+                        setOutAt("");
+                        setNote("");
+                      }}
+                      className="pg-tap flex flex-1 items-center justify-center rounded-lg border border-primary/40 bg-primary/10 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                    >
+                      Settle this day
+                    </button>
+                  ) : undefined
+                }
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      <div className={cn("pg-panel max-h-[calc(100vh-20rem)] overflow-auto", isMobile && "hidden")}>
         <table className="w-full min-w-[720px] text-sm">
           <thead className="pg-thead">
             <tr className="border-b border-border">

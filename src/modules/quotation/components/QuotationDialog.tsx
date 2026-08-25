@@ -10,7 +10,8 @@ import { useCreateQuotation, useUpdateQuotation, useCustomerLookup } from "../ho
 import { DEFAULT_TERMS, DOC_TYPE_LABELS, DOC_TYPES } from "../constants/quotation.constants";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import type { ProductOption } from "@/modules/product/types";
 import type { DocType, Quotation, QuotationPrefill } from "../types";
 
@@ -31,6 +32,33 @@ const numCls = `${inputCls} no-spinner text-right tabular-nums`;
  * above them, because a catalog description runs to many lines (point 5).
  */
 const ITEM_GRID = "grid gap-2 grid-cols-[minmax(140px,2fr)_72px_90px_70px_116px_80px_88px_32px]";
+
+/**
+ * One labelled line-item field, mobile only.
+ *
+ * The label is not optional here the way a column header is on a wide grid: at
+ * 358px the fields stack, and an unlabelled numeric box could be rate, discount
+ * or GST. On a document that becomes a tax invoice, that ambiguity is a costly
+ * one.
+ */
+function ItemField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className={cn("block", className)}>
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
 
 const blankItem = {
   description: "",
@@ -71,6 +99,7 @@ export function QuotationDialog({
   const updateMutation = useUpdateQuotation();
   const lookupMutation = useCustomerLookup();
   const isPending = createMutation.isPending || updateMutation.isPending;
+  const isMobile = useIsMobile();
 
   const form = useForm<QuotationFormValues>({
     resolver: zodResolver(quotationSchema),
@@ -535,79 +564,148 @@ export function QuotationDialog({
                   </div>
                 </div>
 
-                {/* Numeric columns — scroll as a unit so they never shrink
-                    below a readable width. */}
-                <div className="overflow-x-auto pb-1">
-                  <div className="min-w-[740px]">
-                    <div
-                      className={`${ITEM_GRID} mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground`}
-                    >
-                      <div>Model</div>
-                      <div className="text-right">KVA</div>
-                      <div>HSN</div>
-                      <div className="text-right">Qty</div>
-                      <div className="text-right">Rate (₹)</div>
-                      <div className="text-right">Disc %</div>
-                      <div className="text-right">GST %</div>
-                      <div />
-                    </div>
-                    <div className={ITEM_GRID}>
+                {/*
+                  Line-item fields.
+
+                  Below `md` the seven-column grid becomes labelled pairs. The
+                  desktop layout is 740px wide and scrolls sideways as a unit,
+                  which is right on a desktop — the columns must not shrink below
+                  a readable width — and wrong on a 358px sheet, because the
+                  header row that says which box is Rate and which is Disc %
+                  scrolls away with the inputs. On a form you cannot afford to
+                  guess: a discount typed into the GST box is a wrong invoice.
+                */}
+                {isMobile ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <ItemField label="Model" className="col-span-2">
                       <input
                         className={inputCls}
                         placeholder="Model"
                         {...form.register(`items.${i}.model`)}
                       />
+                    </ItemField>
+                    <ItemField label="KVA">
                       <input
                         type="number"
                         step="0.5"
                         className={numCls}
-                        placeholder="KVA"
                         {...form.register(`items.${i}.kva`)}
                       />
-                      <input
-                        className={inputCls}
-                        placeholder="HSN"
-                        {...form.register(`items.${i}.hsnCode`)}
-                      />
+                    </ItemField>
+                    <ItemField label="HSN">
+                      <input className={inputCls} {...form.register(`items.${i}.hsnCode`)} />
+                    </ItemField>
+                    <ItemField label="Qty">
                       <input
                         type="number"
                         className={numCls}
-                        placeholder="Qty"
                         {...form.register(`items.${i}.quantity`)}
                       />
+                    </ItemField>
+                    <ItemField label="Rate (₹)">
                       <input
                         type="number"
                         className={numCls}
-                        placeholder="Rate"
                         {...form.register(`items.${i}.unitPrice`)}
                       />
+                    </ItemField>
+                    <ItemField label="Disc %">
                       <input
                         type="number"
                         className={numCls}
-                        placeholder="Disc%"
                         {...form.register(`items.${i}.discountPct`)}
                       />
+                    </ItemField>
+                    <ItemField label="GST %">
                       <input
                         type="number"
                         className={numCls}
-                        placeholder="GST%"
                         {...form.register(`items.${i}.taxRate`)}
                       />
-                      <div className="flex items-center justify-center">
-                        {fields.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => remove(i)}
-                            className="rounded-md p-1 text-destructive hover:bg-destructive/10"
-                            aria-label="Remove item"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                    </ItemField>
+                    {fields.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => remove(i)}
+                        className="pg-tap col-span-2 flex items-center justify-center gap-1.5 rounded-lg border border-destructive/30 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" /> Remove this item
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto pb-1">
+                    <div className="min-w-[740px]">
+                      <div
+                        className={`${ITEM_GRID} mb-1 px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground`}
+                      >
+                        <div>Model</div>
+                        <div className="text-right">KVA</div>
+                        <div>HSN</div>
+                        <div className="text-right">Qty</div>
+                        <div className="text-right">Rate (₹)</div>
+                        <div className="text-right">Disc %</div>
+                        <div className="text-right">GST %</div>
+                        <div />
+                      </div>
+                      <div className={ITEM_GRID}>
+                        <input
+                          className={inputCls}
+                          placeholder="Model"
+                          {...form.register(`items.${i}.model`)}
+                        />
+                        <input
+                          type="number"
+                          step="0.5"
+                          className={numCls}
+                          placeholder="KVA"
+                          {...form.register(`items.${i}.kva`)}
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder="HSN"
+                          {...form.register(`items.${i}.hsnCode`)}
+                        />
+                        <input
+                          type="number"
+                          className={numCls}
+                          placeholder="Qty"
+                          {...form.register(`items.${i}.quantity`)}
+                        />
+                        <input
+                          type="number"
+                          className={numCls}
+                          placeholder="Rate"
+                          {...form.register(`items.${i}.unitPrice`)}
+                        />
+                        <input
+                          type="number"
+                          className={numCls}
+                          placeholder="Disc%"
+                          {...form.register(`items.${i}.discountPct`)}
+                        />
+                        <input
+                          type="number"
+                          className={numCls}
+                          placeholder="GST%"
+                          {...form.register(`items.${i}.taxRate`)}
+                        />
+                        <div className="flex items-center justify-center">
+                          {fields.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => remove(i)}
+                              className="rounded-md p-1 text-destructive hover:bg-destructive/10"
+                              aria-label="Remove item"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
                 {errors.items?.[i]?.description && (
                   <p className="mt-1 text-xs text-destructive">Description is required</p>
                 )}

@@ -1,5 +1,7 @@
 import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { Sheet } from "@/shared/components/Sheet";
 
 interface FormDialogProps {
   open: boolean;
@@ -33,7 +35,63 @@ export function FormDialog({
   error,
   hideFooter,
 }: FormDialogProps) {
+  const isMobile = useIsMobile();
+
   if (!open) return null;
+
+  const errorBanner = error ? (
+    <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+      {error}
+    </div>
+  ) : null;
+
+  /*
+    Below `md` every form in the app becomes a bottom sheet.
+
+    The arithmetic is what settles it: a `max-w-lg` dialog inside `p-4` leaves
+    ~350px of usable width on a 390px screen, and it centres vertically — so
+    Save lands in the middle of the display, the part of a 6" phone a thumb
+    reaches last, while the keyboard covers the bottom third of the form. A
+    sheet is full-bleed, rises from the edge the thumb is already at, and keeps
+    its footer pinned above the keyboard.
+
+    Cancel and Save also swap to full-width and stack Save first: on a phone the
+    primary action should be the widest target on the screen, not a 90px button
+    tucked into a corner.
+  */
+  if (isMobile) {
+    return (
+      <Sheet
+        open={open}
+        onOpenChange={onOpenChange}
+        title={title}
+        footer={
+          hideFooter ? undefined : (
+            <div className="flex flex-col-reverse gap-2">
+              <button
+                onClick={() => onOpenChange(false)}
+                className="pg-tap w-full rounded-lg border border-border text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              {onSubmit && (
+                <button
+                  onClick={onSubmit}
+                  disabled={isPending}
+                  className="pg-tap w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isPending ? "Saving..." : submitLabel}
+                </button>
+              )}
+            </div>
+          )
+        }
+      >
+        {errorBanner}
+        {children}
+      </Sheet>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -64,11 +122,7 @@ export function FormDialog({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {error && (
-            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          )}
+          {errorBanner}
           {children}
         </div>
 

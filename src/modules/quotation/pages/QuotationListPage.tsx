@@ -8,8 +8,12 @@ import {
   ArrowRightCircle,
   Wand2,
   Mail,
+  MoreHorizontal,
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
+import { Sheet } from "@/shared/components/Sheet";
+import { RecordCard, CardAction } from "@/shared/components/RecordCard";
+import { cn } from "@/lib/utils";
 import { QuotationDialog } from "../components/QuotationDialog";
 import { QuotationWizard } from "../components/QuotationWizard";
 import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
@@ -42,6 +46,36 @@ const TABS: { key: DocType; label: string }[] = DOC_TYPES.map((key) => ({
   label: DOC_TYPE_PLURALS[key],
 }));
 
+/** One full-width row in the mobile document action sheet. */
+function DocSheetAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  tone = "neutral",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "neutral" | "primary";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "pg-tap flex w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors disabled:opacity-40",
+        tone === "primary" ? "text-primary hover:bg-primary/10" : "text-foreground hover:bg-accent",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+    </button>
+  );
+}
+
 export function QuotationListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canDelete = role === "admin";
@@ -59,6 +93,10 @@ export function QuotationListPage() {
   // ResourceListPage owns its own paging/query state, so bumping this key is
   // how an outside creation (the wizard) forces it to reload.
   const [listRefreshKey, setListRefreshKey] = useState(0);
+  // Mobile: the document whose overflow sheet is open, and the one being edited
+  // from it (ResourceListPage only owns the create dialog).
+  const [moreFor, setMoreFor] = useState<Quotation | null>(null);
+  const [editDoc, setEditDoc] = useState<Quotation | null>(null);
 
   async function convertToInvoice(q: Quotation) {
     try {
@@ -110,15 +148,21 @@ export function QuotationListPage() {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
+      {/*
+        Document-type tabs. A scrolling chip strip below `md`: at 390px the three
+        buttons wrapped and "Proforma Invoices" broke across two lines inside its
+        own tab, which made a row of tabs look like a paragraph.
+      */}
+      <div className="pg-chips md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
         {TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setDocType(t.key)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+            aria-pressed={docType === t.key}
+            className={`pg-chip md:rounded-lg md:px-4 ${
               docType === t.key
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "border border-border bg-card hover:bg-accent"
+                ? "md:bg-primary md:text-primary-foreground md:shadow-sm"
+                : "md:border-border md:bg-card md:hover:bg-accent"
             }`}
           >
             {t.label}
@@ -126,18 +170,20 @@ export function QuotationListPage() {
         ))}
       </div>
 
-      {/* Point 15 — the catalog-driven builder, alongside the plain dialog. */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setWizardOpen(true)}
-          data-testid="open-wizard"
-          className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-        >
-          <Wand2 className="h-4 w-4" /> Build from catalog
-        </button>
-      </div>
-
       <ResourceListPage<Quotation, QuotationListQuery>
+        /* Point 15 — the catalog-driven builder, alongside the plain dialog. */
+        headerActions={
+          <button
+            onClick={() => setWizardOpen(true)}
+            data-testid="open-wizard"
+            aria-label="Build from catalog"
+            title="Build from catalog"
+            className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 text-sm font-medium text-primary transition-colors hover:bg-primary/20 md:min-h-0 md:min-w-0 md:px-3 md:py-1.5"
+          >
+            <Wand2 className="h-4 w-4" />
+            <span className="hidden md:inline">Build from catalog</span>
+          </button>
+        }
         key={`${docType}-${listRefreshKey}`}
         title={DOC_TYPE_PLURALS[docType]}
         subtitle={
@@ -279,6 +325,69 @@ export function QuotationListPage() {
             )}
           </div>
         )}
+        /*
+          A document as a card.
+
+          Number and grand total are the two things anyone scans a quotation
+          list for, so they anchor the two top corners. Taxable value and the
+          GST split stay off the card — they are reconciliation figures, read on
+          a desk, and putting all four on a 390px line is how the table ended up
+          1100px wide in the first place.
+
+          Share is the one action promoted, because sending a PI to a customer on
+          WhatsApp is the reason this screen gets opened on a phone at all.
+        */
+        renderMobileCard={(q) => (
+          <RecordCard
+            onClick={() => !q.isIssued && setEditDoc(q)}
+            title={
+              <span className="flex flex-wrap items-center gap-1.5">
+                <span className="font-mono text-primary">{q.docNumberFormatted}</span>
+                {q.isIssued && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <Lock className="h-2.5 w-2.5" /> Issued
+                  </span>
+                )}
+              </span>
+            }
+            amount={formatCurrency(q.grandTotal)}
+            meta={[
+              q.customerName,
+              formatDate(q.date),
+              `${q.items.length} item${q.items.length === 1 ? "" : "s"}`,
+            ]}
+            badge={
+              <span
+                className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${DOC_STATUS_COLORS[q.status]}`}
+              >
+                {DOC_STATUS_LABELS[q.status]}
+              </span>
+            }
+            actions={
+              <>
+                <CardAction icon={FileText} label="PDF" onClick={() => viewPdf(q)} />
+                <CardAction
+                  icon={MessageCircle}
+                  label="Share"
+                  tone="whatsapp"
+                  data-testid={`share-whatsapp-${q.id}`}
+                  onClick={() => setShare({ doc: q, channel: "whatsapp" })}
+                />
+                <button
+                  type="button"
+                  aria-label="More actions"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMoreFor(q);
+                  }}
+                  className="pg-tap flex shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </>
+            }
+          />
+        )}
         renderDialog={({ open, onOpenChange, mode, value, onSuccess }) => (
           <QuotationDialog
             open={open}
@@ -289,6 +398,78 @@ export function QuotationListPage() {
             onSuccess={onSuccess}
           />
         )}
+      />
+
+      {/* The remaining document actions, on mobile. */}
+      <Sheet
+        open={Boolean(moreFor)}
+        onOpenChange={(o) => !o && setMoreFor(null)}
+        title={moreFor?.docNumberFormatted ?? "Document"}
+      >
+        {moreFor && (
+          <div className="space-y-1">
+            <DocSheetAction
+              icon={Pencil}
+              label={moreFor.isIssued ? "Edit (issued — locked)" : "Edit"}
+              disabled={moreFor.isIssued}
+              onClick={() => {
+                setEditDoc(moreFor);
+                setMoreFor(null);
+              }}
+            />
+            <DocSheetAction
+              icon={Download}
+              label="Download PDF"
+              onClick={() => {
+                void downloadPdf(moreFor);
+                setMoreFor(null);
+              }}
+            />
+            <DocSheetAction
+              icon={Mail}
+              label="Email this document"
+              onClick={() => {
+                setShare({ doc: moreFor, channel: "email" });
+                setMoreFor(null);
+              }}
+            />
+            {moreFor.docType === "proforma" && (
+              <DocSheetAction
+                icon={ArrowRightCircle}
+                label="Raise tax invoice"
+                tone="primary"
+                onClick={() => {
+                  void convertToInvoice(moreFor);
+                  setMoreFor(null);
+                }}
+              />
+            )}
+            {moreFor.docType === "invoice" && !moreFor.isIssued && canIssue && (
+              <DocSheetAction
+                icon={Lock}
+                label="Issue invoice"
+                tone="primary"
+                onClick={() => {
+                  setConfirmIssue(moreFor);
+                  setMoreFor(null);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* Edit reached from a card — ResourceListPage owns only the create dialog. */}
+      <QuotationDialog
+        open={Boolean(editDoc)}
+        onOpenChange={(o) => !o && setEditDoc(null)}
+        mode="edit"
+        value={editDoc}
+        defaultDocType={docType}
+        onSuccess={() => {
+          setEditDoc(null);
+          setListRefreshKey((k) => k + 1);
+        }}
       />
 
       <QuotationWizard

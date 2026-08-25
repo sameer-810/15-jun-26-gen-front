@@ -16,7 +16,8 @@ import { Link } from "react-router-dom";
 import { useDashboard, useSalesAnalytics } from "../hooks/useDashboard";
 import { RemindersPanel } from "@/modules/lead/components/RemindersPanel";
 import { useAppSelector } from "@/app/hooks";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact, formatDate } from "@/lib/utils";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import { StatCard } from "@/shared/components/StatCard";
 import { Badge } from "@/shared/components/Badge";
 import { LEAD_STATUS_LABELS } from "@/modules/lead/constants/lead.constants";
@@ -234,6 +235,7 @@ function GstRevenueChart() {
 export function DashboardPage() {
   const { data, isLoading, error, refetch } = useDashboard();
   const user = useAppSelector((s) => s.auth.user);
+  const isMobile = useIsMobile();
 
   if (error) {
     return (
@@ -309,10 +311,11 @@ export function DashboardPage() {
         <button
           onClick={() => refetch()}
           disabled={isLoading}
-          className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+          aria-label="Refresh"
+          className="pg-tap flex shrink-0 items-center justify-center gap-1.5 rounded-lg text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 md:min-h-0 md:min-w-0 md:border md:border-border md:px-3 md:py-1.5"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          Refresh
+          <RefreshCw className={`h-4 w-4 md:h-3.5 md:w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          <span className="hidden md:inline">Refresh</span>
         </button>
       </div>
 
@@ -328,10 +331,26 @@ export function DashboardPage() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        /*
+          Two-up on a phone, not one.
+
+          Stacked single-file these four tiles came to roughly 1000px — a full
+          screen and a half of scrolling to read four numbers, each tile 358px
+          wide to hold a figure that needs 140. Two columns puts all four above
+          the fold, which is what a dashboard is for. It also matches the
+          loading skeleton, which was already `grid-cols-2` and so visibly
+          reflowed from two columns to one the moment the data arrived.
+        */
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {/* Compact rupees on a phone — the full figure does not fit a
+              half-width tile and wrapped mid-number. See formatCurrencyCompact. */}
           <StatCard
             label="Open Pipeline"
-            value={formatCurrency(data?.pipeline.openValue ?? 0)}
+            value={
+              isMobile
+                ? formatCurrencyCompact(data?.pipeline.openValue ?? 0)
+                : formatCurrency(data?.pipeline.openValue ?? 0)
+            }
             hint={`${data?.pipeline.openCount ?? 0} active leads`}
           />
           <StatCard
@@ -347,7 +366,11 @@ export function DashboardPage() {
           />
           <StatCard
             label="Sales This Month"
-            value={formatCurrency(data?.sales.thisMonthValue ?? 0)}
+            value={
+              isMobile
+                ? formatCurrencyCompact(data?.sales.thisMonthValue ?? 0)
+                : formatCurrency(data?.sales.thisMonthValue ?? 0)
+            }
             hint={`${data?.sales.totalUnits ?? 0} units all-time`}
           />
         </div>

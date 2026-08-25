@@ -13,6 +13,9 @@ import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { PageLoader } from "@/shared/components/PageLoader";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { Fab } from "@/shared/components/Fab";
+import { RecordCard, CardAction } from "@/shared/components/RecordCard";
 
 /**
  * The branch / godown master list behind the Location dropdowns
@@ -27,6 +30,7 @@ export function LocationsPage() {
   const canManage = role === "admin" || role === "manager" || role === "inventory";
   const canDelete = role === "admin";
 
+  const isMobile = useIsMobile();
   const { data, isLoading } = useLocations({ limit: 200 });
   const createMutation = useCreateLocation();
   const updateMutation = useUpdateLocation();
@@ -110,10 +114,12 @@ export function LocationsPage() {
   return (
     <div className="erp-page" data-testid="locations-page">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Locations</h1>
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-bold text-foreground md:block">Locations</h1>
           <p className="text-sm text-muted-foreground">
-            Branches and godowns · {data?.meta.total ?? 0} records · used by the Location dropdowns
+            <span className="hidden md:inline">Branches and godowns · </span>
+            <span className="font-mono tabular-nums">{data?.meta.total ?? 0}</span> records
+            <span className="hidden md:inline"> · used by the Location dropdowns</span>
           </p>
         </div>
         {canManage && (
@@ -122,15 +128,17 @@ export function LocationsPage() {
               onClick={seed}
               disabled={seedMutation.isPending}
               data-testid="seed-locations"
-              className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50"
+              aria-label="Import from existing"
+              className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent disabled:opacity-50 md:min-h-0 md:min-w-0 md:px-3 md:py-2"
               title="Create master entries from locations already typed into stock and sales"
             >
-              <Download className="h-4 w-4" /> Import from existing
+              <Download className="h-4 w-4" />
+              <span className="hidden md:inline">Import from existing</span>
             </button>
             <button
               onClick={() => openEditor(null)}
               data-testid="new-location"
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              className="hidden items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:flex"
             >
               <Plus className="h-4 w-4" /> New Location
             </button>
@@ -141,18 +149,62 @@ export function LocationsPage() {
       {isLoading ? (
         <PageLoader />
       ) : !data?.items.length ? (
-        <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">
+        <div className="pg-tile p-10 text-center text-sm text-muted-foreground">
           No locations yet. Add one, or import the locations already typed into stock and sales.
         </div>
+      ) : isMobile ? (
+        <div className="space-y-2">
+          {data.items.map((l) => (
+            <RecordCard
+              key={l.id}
+              onClick={canManage ? () => openEditor(l) : undefined}
+              title={l.name}
+              meta={[
+                [l.city, l.state].filter(Boolean).join(", "),
+                [l.contactPerson, l.mobile].filter(Boolean).join(" "),
+                l.usage ? `${l.usage.inventory} stock · ${l.usage.sales} sales` : null,
+              ]}
+              badge={
+                l.isActive ? undefined : (
+                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                    Inactive
+                  </span>
+                )
+              }
+              actions={
+                canManage ? (
+                  <>
+                    <CardAction icon={Pencil} label="Edit" onClick={() => openEditor(l)} />
+                    {canDelete && (
+                      <CardAction
+                        icon={Trash2}
+                        label="Delete"
+                        data-testid={`delete-location-${l.id}`}
+                        onClick={() => setConfirmDelete(l)}
+                      />
+                    )}
+                  </>
+                ) : undefined
+              }
+            />
+          ))}
+        </div>
       ) : (
-        <div className="overflow-auto rounded-xl border border-border bg-card shadow-sm">
+        /*
+          As on Users: `pg-panel` instead of a shadowed in-page box, and Actions
+          moved out of the anchor column to the end of the row. See DESIGN.md.
+        */
+        <div className="pg-panel max-h-[calc(100vh-15rem)] overflow-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead className="border-b border-border bg-muted/40">
-              <tr>
-                {["Actions", "Name", "City", "State", "Contact", "In use", "Status"].map((h) => (
+            <thead className="pg-thead">
+              <tr className="border-b border-border">
+                {["Name", "City", "State", "Contact", "In use", "Status", "Actions"].map((h) => (
                   <th
                     key={h}
-                    className="whitespace-nowrap px-4 py-3 text-left font-medium text-muted-foreground"
+                    scope="col"
+                    className={`whitespace-nowrap px-4 py-2.5 text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground ${
+                      h === "Actions" ? "text-right" : "text-left"
+                    }`}
                   >
                     {h}
                   </th>
@@ -161,30 +213,7 @@ export function LocationsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {data.items.map((l) => (
-                <tr key={l.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-2.5">
-                    {canManage ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => openEditor(l)}
-                          className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
-                        >
-                          <Pencil className="h-3 w-3" /> Edit
-                        </button>
-                        {canDelete && (
-                          <button
-                            onClick={() => setConfirmDelete(l)}
-                            data-testid={`delete-location-${l.id}`}
-                            className="flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">View only</span>
-                    )}
-                  </td>
+                <tr key={l.id} className="transition-colors hover:bg-accent/40">
                   <td className="px-4 py-2.5 font-medium">{l.name}</td>
                   <td className="px-4 py-2.5">{l.city || "-"}</td>
                   <td className="px-4 py-2.5">{l.state || "-"}</td>
@@ -205,12 +234,39 @@ export function LocationsPage() {
                       </span>
                     )}
                   </td>
+                  <td className="px-4 py-2.5">
+                    {canManage ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => openEditor(l)}
+                          className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-accent"
+                        >
+                          <Pencil className="h-3 w-3" /> Edit
+                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => setConfirmDelete(l)}
+                            data-testid={`delete-location-${l.id}`}
+                            className="flex items-center gap-1 rounded-md border border-destructive/30 bg-destructive/10 px-2.5 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/20"
+                          >
+                            <Trash2 className="h-3 w-3" /> Delete
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="block text-right text-xs text-muted-foreground">
+                        View only
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {canManage && <Fab label="New Location" onClick={() => openEditor(null)} />}
 
       <FormDialog
         open={dialogOpen}

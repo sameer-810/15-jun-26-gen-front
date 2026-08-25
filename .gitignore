@@ -19,6 +19,19 @@ dist-ssr/
 /blob-report/
 /playwright/.cache/
 
+# Client reports — regenerate with:
+#   npx playwright test e2e/capture-report.spec.ts && node scripts/build-report.mjs
+#   MOBILE_SHOT_DIR=mobile-before npx playwright test e2e/capture-mobile.spec.ts
+#   MOBILE_SHOT_DIR=mobile-after  npx playwright test e2e/capture-mobile.spec.ts
+#   node scripts/build-mobile-report.mjs
+# The screenshots are captured from the running app, so they are build output,
+# not source. The finished PDFs are written to the repository root.
+#
+# The mobile "before" set is the one exception worth knowing about: it can only
+# be recaptured by checking out the pre-redesign code, so if it is ever needed
+# again it must come from the PDF rather than from a fresh run.
+/report-shots/
+
 # Environment
 .env
 .env.local

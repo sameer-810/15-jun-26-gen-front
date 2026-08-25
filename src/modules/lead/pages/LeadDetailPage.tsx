@@ -153,13 +153,15 @@ export function LeadDetailPage() {
       <div className="pg-tile">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
+            {/* Desktop only — on a phone the top bar carries a back chevron, and
+                two back affordances a centimetre apart is one too many. */}
             <button
               onClick={() => navigate("/leads")}
-              className="mb-2 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              className="mb-2 hidden items-center gap-1 text-xs text-muted-foreground hover:text-foreground md:flex"
             >
               <ArrowLeft className="h-3 w-3" /> Back to leads
             </button>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
               {lead.customerName}
             </h1>
             <p className="mt-0.5 text-sm text-muted-foreground">

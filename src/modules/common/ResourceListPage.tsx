@@ -9,10 +9,16 @@ import {
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { Sheet } from "@/shared/components/Sheet";
+import { Fab } from "@/shared/components/Fab";
+import { RecordCard } from "@/shared/components/RecordCard";
 
 /**
  * Anything inside a row that already does something on click. A row-level
@@ -64,6 +70,17 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   deleteConfirmText?: string;
   hideActionsColumn?: boolean;
   hideCreateButton?: boolean;
+  /**
+   * Secondary actions for the header, beside Refresh — Import Leads, Build from
+   * catalog, and the like.
+   *
+   * These used to be rendered by the page itself in a `justify-end` row *above*
+   * `<ResourceListPage>`, which on a phone produced the Leads screen opening
+   * with a lone "Import Leads" button sitting above its own page title. Given a
+   * slot, they join the header row and collapse to icons at 390px like
+   * everything else in it.
+   */
+  headerActions?: React.ReactNode;
   columns: Column<TItem>[];
   useList: (query: TQuery) => {
     data?: {
@@ -76,7 +93,32 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   };
   useDelete?: () => { mutateAsync: (id: string) => Promise<unknown>; isPending?: boolean };
   buildQuery: (args: { search: string; page: number; limit: number }) => TQuery;
-  renderFilters?: (args: { search: string; setSearch: (v: string) => void }) => React.ReactNode;
+  /**
+   * The screen's filter controls.
+   *
+   * `layout` says where they are being drawn. On desktop they sit inline above
+   * the table (`"inline"`); on a phone they are moved into a sheet
+   * (`"sheet"`) behind a Filters button, because rendered inline they filled the
+   * entire first screen — /leads opened with seven stacked controls and roughly
+   * 1200px of form before the first lead appeared.
+   *
+   * A page must omit its own search field when `layout === "sheet"`: the list
+   * puts search in the sticky toolbar itself, since it is the one filter used
+   * often enough to deserve permanent space, and rendering it twice is the
+   * obvious failure mode of moving the rest away.
+   */
+  renderFilters?: (args: {
+    search: string;
+    setSearch: (v: string) => void;
+    layout: "inline" | "sheet";
+  }) => React.ReactNode;
+  /**
+   * Number of filters currently narrowing the list, excluding search. Shown on
+   * the mobile Filters button, because once the controls are behind a sheet
+   * there is otherwise nothing to say the list is filtered — and a list that is
+   * silently filtered reads as a list with missing records.
+   */
+  activeFilterCount?: number;
   hideDefaultSearch?: boolean;
   renderDialog?: (args: {
     open: boolean;
@@ -130,6 +172,24 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
    * means the edit dialog. Ignored when `rowHref` is set.
    */
   rowOpensEditor?: boolean;
+  /**
+   * How one record looks below `md`, where the table is replaced by cards.
+   *
+   * A table earns its keep by aligning a column so the eye can run down it. That
+   * needs width; at 390px there is none, and every list here was 800–1500px
+   * wide, so the table degraded into sideways panning — three columns visible,
+   * the rest off-screen, and the customer name wrapped over three lines. Cards
+   * drop the alignment deliberately and keep each record whole.
+   *
+   * Optional. Without it the list derives a serviceable card from the first few
+   * columns, which is right for a secondary screen and wrong for a primary one:
+   * a column order tuned for scanning a wide grid is not the order someone reads
+   * on a phone, and only the page knows which two facts actually matter.
+   */
+  renderMobileCard?: (
+    item: TItem,
+    helpers: { onEdit: (item: TItem) => void; onRequestDelete: (id: string) => void },
+  ) => React.ReactNode;
 }
 
 export function ResourceListPage<TItem extends { id: string }, TQuery extends object>({
@@ -142,11 +202,13 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   deleteConfirmText = "Delete this record? This cannot be undone.",
   hideActionsColumn,
   hideCreateButton,
+  headerActions,
   columns,
   useList,
   useDelete,
   buildQuery,
   renderFilters,
+  activeFilterCount = 0,
   hideDefaultSearch,
   renderDialog,
   renderActions,
@@ -154,8 +216,21 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   renderBulkActions,
   rowHref,
   rowOpensEditor,
+  renderMobileCard,
 }: ResourceListPageProps<TItem, TQuery>) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  /**
+   * Mobile-only selection mode.
+   *
+   * On desktop the checkbox column costs 40px once, in a header, and is free
+   * after that. On a phone it costs 44px on the left of *every* card — a ninth
+   * of the screen width, permanently, for an action most people use rarely.
+   * Bulk assign is a manager's Monday-morning job, not something anyone does
+   * from a customer's site, so it is opt-in: tap Select, the checkboxes appear.
+   */
+  const [selectMode, setSelectMode] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
@@ -278,25 +353,61 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
 
   return (
     <div className="erp-page">
-      {/* Header. The record count is mono so it stops shifting the subtitle's
-          width every time the filter changes. */}
+      {/*
+        Header.
+
+        On desktop: title and subtitle left, Refresh and the create button right.
+
+        On a phone that same row wrapped into three — and because several pages
+        render an extra control above the list (Import Leads, Build from
+        catalog), the Leads screen opened with "Import Leads" floating alone on
+        its own line *above* its own page title. So below `md` the title keeps
+        the row to itself, Refresh becomes a quiet icon, and the create button
+        leaves the flow entirely to become the FAB at the bottom of the screen.
+
+        The record count is mono so it stops shifting the subtitle's width every
+        time the filter changes.
+      */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <div className="min-w-0">
+          {/* Redundant on mobile — the top bar already names the screen. */}
+          <h1 className="hidden text-xl font-semibold tracking-tight text-foreground md:block">
+            {title}
+          </h1>
           {subtitle && (
             <p className="text-sm text-muted-foreground">
-              {subtitle} · <span className="font-mono tabular-nums">{total}</span> records
+              <span className="hidden md:inline">{subtitle} · </span>
+              <span className="font-mono tabular-nums">{total}</span> records
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
+          {selectionEnabled && isMobile && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectMode((m) => !m);
+                clearSelection();
+              }}
+              className={cn(
+                "pg-tap flex items-center justify-center rounded-lg border px-3 text-sm font-medium transition-colors",
+                selectMode
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              {selectMode ? "Done" : "Select"}
+            </button>
+          )}
+          {headerActions}
           <button
             onClick={() => refetch()}
             disabled={isLoading}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+            aria-label="Refresh"
+            className="pg-tap flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 md:min-h-0 md:min-w-0 md:border md:border-border md:px-3 md:py-1.5"
           >
-            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
-            Refresh
+            <RefreshCw className={cn("h-4 w-4 md:h-3.5 md:w-3.5", isLoading && "animate-spin")} />
+            <span className="hidden md:inline">Refresh</span>
           </button>
           {!hideCreateButton && renderDialog && (
             <button
@@ -305,7 +416,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
                 setEditing(null);
                 setDialogOpen(true);
               }}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              className="hidden items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 md:flex"
             >
               <Plus className="h-4 w-4" />
               {newButtonText}
@@ -314,11 +425,56 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         </div>
       </div>
 
-      {/* Filters. The default search no longer sits in its own bordered, shadowed
-          panel with a "Search" label above it — that was a box around a single
-          input. The placeholder already says what it searches. */}
-      {renderFilters ? (
-        renderFilters({ search, setSearch: setSearchAndReset })
+      {/*
+        Filters.
+
+        Desktop keeps them inline, as before. Below `md` they move into a sheet
+        and only search stays on screen: rendered inline on a phone the Leads
+        filter block was seven stacked controls — search, a Calls segmented
+        control that wrapped onto two lines, location, a qty min/max pair, two
+        date inputs, status and source — roughly 1200px of form standing between
+        the user and the first record.
+
+        Search stays out because it is the one filter used often enough to earn
+        permanent space. The count on the Filters button is what stops a
+        silently-filtered list from reading as a list with records missing.
+      */}
+      {isMobile ? (
+        <div className="flex items-center gap-2">
+          {!hideDefaultSearch && (
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearchAndReset(e.target.value)}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                type="search"
+                className="h-11 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          )}
+          {renderFilters && (
+            <button
+              type="button"
+              onClick={() => setFilterSheetOpen(true)}
+              aria-label="Filters"
+              className={cn(
+                "pg-tap flex shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors",
+                activeFilterCount > 0
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground",
+              )}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              {activeFilterCount > 0 && (
+                <span className="font-mono tabular-nums">{activeFilterCount}</span>
+              )}
+            </button>
+          )}
+        </div>
+      ) : renderFilters ? (
+        renderFilters({ search, setSearch: setSearchAndReset, layout: "inline" })
       ) : !hideDefaultSearch ? (
         <input
           value={search}
@@ -328,6 +484,25 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           className="w-full max-w-sm rounded-lg border border-input bg-card px-3 py-2 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
         />
       ) : null}
+
+      {isMobile && renderFilters && (
+        <Sheet
+          open={filterSheetOpen}
+          onOpenChange={setFilterSheetOpen}
+          title="Filters"
+          footer={
+            <button
+              type="button"
+              onClick={() => setFilterSheetOpen(false)}
+              className="pg-tap w-full rounded-lg bg-primary text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Show <span className="font-mono tabular-nums">{total}</span> results
+            </button>
+          }
+        >
+          {renderFilters({ search, setSearch: setSearchAndReset, layout: "sheet" })}
+        </Sheet>
+      )}
 
       {error ? (
         <div
@@ -381,7 +556,82 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         into second place. Actions belong at the end of the row, after the data
         you read to decide whether to act.
       */}
-      <div className="pg-panel max-h-[calc(100vh-15rem)] min-h-[24rem] overflow-auto">
+      {/*
+        The card list — below `md` only, replacing the table entirely.
+
+        `max-h` is deliberately absent here. On desktop the panel scrolls
+        internally so the pinned header survives a 50-row page; on a phone that
+        same rule produced a short scroll box inside a scrolling page inside a
+        sideways-scrolling table — three scroll axes on one screen, and the
+        outer one moving whenever the inner one hit its end. The cards just
+        extend the page and the whole thing scrolls once.
+      */}
+      {isMobile && (
+        <div className="space-y-2">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : items.length === 0 ? (
+            <p className="pg-panel px-4 py-12 text-center text-sm text-muted-foreground">
+              {emptyText}
+            </p>
+          ) : (
+            items.map((item) => {
+              const card = renderMobileCard ? (
+                renderMobileCard(item, { onEdit, onRequestDelete: setConfirmDelete })
+              ) : (
+                /*
+                  Fallback for a screen that has not defined its own card. The
+                  first column is the anchor — DESIGN.md puts the identifying
+                  value there — and the next three become the meta line.
+                */
+                <RecordCard
+                  title={columns[0]?.getValue(item)}
+                  meta={columns.slice(1, 4).map((c) => c.getValue(item))}
+                  to={rowHref?.(item)}
+                  onClick={rowOpensEditor && !rowHref ? () => onEdit(item) : undefined}
+                  actions={
+                    !hideActionsColumn && renderActions ? (
+                      <div className="flex flex-1 items-center gap-1.5">
+                        {renderActions(item, onEdit, setConfirmDelete)}
+                      </div>
+                    ) : undefined
+                  }
+                />
+              );
+
+              if (!selectionEnabled || !selectMode) return <div key={item.id}>{card}</div>;
+              return (
+                <div key={item.id} className="flex items-start gap-2">
+                  {isRowSelectable?.(item) ? (
+                    <label className="pg-tap flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Select record"
+                        data-testid={`select-row-${item.id}`}
+                        checked={selected.includes(item.id)}
+                        onChange={() => toggleRow(item.id)}
+                        className="h-5 w-5 rounded border-input accent-primary"
+                      />
+                    </label>
+                  ) : (
+                    <span className="w-11 shrink-0" aria-hidden="true" />
+                  )}
+                  <div className="min-w-0 flex-1">{card}</div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+
+      <div
+        className={cn(
+          "pg-panel max-h-[calc(100vh-15rem)] min-h-[24rem] overflow-auto",
+          isMobile && "hidden",
+        )}
+      >
         <table className={cn("w-full text-sm", minTableWidth)}>
           <thead className="pg-thead">
             <tr className="border-b border-border">
@@ -529,8 +779,20 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         </table>
       </div>
 
-      {/* Pagination */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-4 py-2 text-sm">
+      {/*
+        Pagination.
+
+        The desktop control is seven numbered pages, a rows-per-page select and
+        four chevrons. At 390px it wrapped to three lines and every target was
+        under 30px, so paging by thumb meant hitting page 4 when you wanted 3.
+
+        Mobile gets the two controls that matter — previous and next, at full
+        touch size — plus the range readout, which is the part that actually
+        answers "where am I". Jump-to-page and rows-per-page are desktop
+        affordances: on a phone you scroll, and page 7 of 55 is not a thing
+        anyone navigates to deliberately.
+      */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm md:px-4">
         <span className="text-muted-foreground">
           Showing{" "}
           <span className="font-mono tabular-nums text-foreground">
@@ -538,7 +800,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           </span>{" "}
           of <span className="font-mono tabular-nums text-foreground">{total}</span>
         </span>
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 md:flex">
           <span className="text-muted-foreground">Rows:</span>
           <select
             value={pageSize}
@@ -555,10 +817,13 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-1">
+
+        {/* Desktop: full pager. */}
+        <div className="hidden items-center gap-1 md:flex">
           <button
             onClick={() => setPage(1)}
             disabled={!hasPrev}
+            aria-label="First page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -566,6 +831,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           <button
             onClick={() => setPage((p) => p - 1)}
             disabled={!hasPrev}
+            aria-label="Previous page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -594,6 +860,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           <button
             onClick={() => setPage((p) => p + 1)}
             disabled={!hasNext}
+            aria-label="Next page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
           >
             <ChevronRight className="h-4 w-4" />
@@ -601,12 +868,48 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           <button
             onClick={() => setPage(totalPages)}
             disabled={!hasNext}
+            aria-label="Last page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
           >
             <ChevronsRight className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Mobile: prev / page-of / next, all at thumb size. */}
+        <div className="flex items-center gap-1 md:hidden">
+          <button
+            onClick={() => setPage((p) => p - 1)}
+            disabled={!hasPrev}
+            aria-label="Previous page"
+            className="pg-tap flex items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors disabled:opacity-40"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <span className="px-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+            {page}/{totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => p + 1)}
+            disabled={!hasNext}
+            aria-label="Next page"
+            className="pg-tap flex items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors disabled:opacity-40"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
+
+      {/* The create action, lifted out of the header — see Fab. */}
+      {!hideCreateButton && renderDialog && (
+        <Fab
+          label={newButtonText}
+          onClick={() => {
+            setMode("create");
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        />
+      )}
 
       {/* Delete confirm */}
       {confirmDelete && (

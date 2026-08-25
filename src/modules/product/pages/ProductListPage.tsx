@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2, Download, Upload, ImageOff, PackagePlus } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
+import { RecordCard } from "@/shared/components/RecordCard";
 import { ProductDialog } from "../components/ProductDialog";
 import { useProducts, useDeleteProduct, useProductFacets } from "../hooks/useProducts";
 import { importProducts, productExportPath, seedCatalogFromInventory } from "../api/productApi";
@@ -18,7 +19,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { Product, ProductListQuery, ProductFuelType } from "../types";
 
 const filterSelectCls =
-  "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+  "w-full md:w-auto rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 const filterInputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 
@@ -87,41 +88,55 @@ export function ProductListPage() {
     }
   }
 
+  // Search excluded — it keeps its own always-visible box on mobile.
+  const activeFilterCount = [fuelType, category, activeOnly].filter(Boolean).length;
+
   return (
     <>
-      {canManage && (
-        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={onFileChosen}
-            className="hidden"
-          />
-          <button
-            onClick={onSeedFromInventory}
-            data-testid="seed-from-inventory"
-            title="Create catalog entries for the models already in Inventory"
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            <PackagePlus className="h-4 w-4" /> Import from Inventory
-          </button>
-          <button
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            <Upload className="h-4 w-4" /> Import Excel
-          </button>
-          <button
-            onClick={onExport}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            <Download className="h-4 w-4" /> Export Excel
-          </button>
-        </div>
-      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={onFileChosen}
+        className="hidden"
+      />
 
       <ResourceListPage<Product, ProductListQuery>
+        activeFilterCount={activeFilterCount}
+        headerActions={
+          canManage ? (
+            <>
+              <button
+                onClick={onSeedFromInventory}
+                data-testid="seed-from-inventory"
+                aria-label="Import from Inventory"
+                title="Create catalog entries for the models already in Inventory"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+              >
+                <PackagePlus className="h-4 w-4" />
+                <span className="hidden md:inline">Import from Inventory</span>
+              </button>
+              <button
+                onClick={() => fileRef.current?.click()}
+                aria-label="Import Excel"
+                title="Import Excel"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden md:inline">Import Excel</span>
+              </button>
+              <button
+                onClick={onExport}
+                aria-label="Export Excel"
+                title="Export Excel"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden md:inline">Export Excel</span>
+              </button>
+            </>
+          ) : undefined
+        }
         title="Product Catalog"
         subtitle="Descriptions, specs and images that feed quotations"
         newButtonText="New Product"
@@ -198,6 +213,49 @@ export function ProductListPage() {
               ),
           },
         ]}
+        /*
+          A catalog entry as a card. The thumbnail earns its place here in a way
+          it never quite did in the table: on a phone the picture is how someone
+          recognises a genset faster than the model code does. Spec and image
+          counts drop — they are authoring metadata, not shopping information.
+        */
+        renderMobileCard={(p, { onEdit }) => (
+          <RecordCard
+            onClick={canManage ? () => onEdit(p) : undefined}
+            title={
+              <span className="flex items-center gap-2.5">
+                {p.primaryImageUrl ? (
+                  <img
+                    src={p.primaryImageUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-10 w-10 shrink-0 rounded border border-border object-cover"
+                  />
+                ) : (
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-border bg-muted/40">
+                    <ImageOff className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">{p.name}</span>
+              </span>
+            }
+            amount={p.price ? formatCurrency(p.price) : undefined}
+            meta={[
+              [p.brand, p.modelCode].filter(Boolean).join(" "),
+              p.kva ? `${p.kva} kVA` : null,
+              PRODUCT_FUEL_LABELS[p.fuelType],
+              PRODUCT_PHASE_LABELS[p.phase],
+              `GST ${p.taxRate}%`,
+            ]}
+            badge={
+              p.isActive ? undefined : (
+                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                  Inactive
+                </span>
+              )
+            }
+          />
+        )}
         useList={useProducts}
         useDelete={canDelete ? useDeleteProduct : undefined}
         buildQuery={({ search, page, limit }) => ({
@@ -208,23 +266,29 @@ export function ProductListPage() {
           page,
           limit,
         })}
-        renderFilters={({ search, setSearch }) => (
-          <div className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="min-w-[220px] flex-1">
-              <label
-                className="mb-1 block text-xs font-medium text-muted-foreground"
-                htmlFor="product-search"
-              >
-                Search
-              </label>
-              <input
-                id="product-search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Name, brand or model..."
-                className={filterInputCls}
-              />
-            </div>
+        renderFilters={({ search, setSearch, layout }) => (
+          /* `rounded-xl … shadow-sm` was an in-page panel claiming elevation it
+             has not earned — `pg-tile` is the house primitive. See DESIGN.md. */
+          <div
+            className={layout === "sheet" ? "space-y-4" : "pg-tile flex flex-wrap items-end gap-3"}
+          >
+            {layout === "inline" && (
+              <div className="min-w-[220px] flex-1">
+                <label
+                  className="mb-1 block text-xs font-medium text-muted-foreground"
+                  htmlFor="product-search"
+                >
+                  Search
+                </label>
+                <input
+                  id="product-search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Name, brand or model..."
+                  className={filterInputCls}
+                />
+              </div>
+            )}
             <div>
               <label
                 className="mb-1 block text-xs font-medium text-muted-foreground"

@@ -12,8 +12,12 @@ import {
   Phone,
   Upload,
   UserPlus,
+  MoreHorizontal,
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
+import { Sheet } from "@/shared/components/Sheet";
+import { RecordCard, CardAction } from "@/shared/components/RecordCard";
+import { cn, initialsOf } from "@/lib/utils";
 import { LeadDialog } from "../components/LeadDialog";
 import { FollowUpDialog } from "../components/FollowUpDialog";
 import { ConvertLeadDialog } from "../components/ConvertLeadDialog";
@@ -49,10 +53,52 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { Lead, LeadListQuery, LeadStatus, LeadSource, CallFilter } from "../types";
 import type { QuotationPrefill } from "@/modules/quotation/types";
 
+/**
+ * `w-full md:w-auto` so the same control works in both places the filter block
+ * is rendered: a wrapping row on desktop, where each select should be its
+ * natural width, and a stacked sheet on mobile, where anything narrower than
+ * full width just looks unfinished.
+ */
 const filterSelectCls =
-  "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+  "w-full md:w-auto rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 const filterInputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+
+/**
+ * One row in a mobile action sheet.
+ *
+ * Full width and 44px tall, which is the whole reason the sheet exists: the
+ * desktop row packs these same eight actions into 26px icon buttons, and that
+ * is a mouse target, not a thumb target.
+ */
+function SheetAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  tone = "neutral",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "neutral" | "primary";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "pg-tap flex w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors disabled:opacity-40",
+        tone === "primary" ? "text-primary hover:bg-primary/10" : "text-foreground hover:bg-accent",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+    </button>
+  );
+}
 
 /** Blank quantity boxes must mean "no filter", not 0. */
 function toQty(v: string): number | undefined {
@@ -106,6 +152,11 @@ export function LeadListPage() {
   const logCall = useLogCall();
   // The lead we are waiting on a call outcome for. See the call button below.
   const [callOutcomeFor, setCallOutcomeFor] = useState<Lead | null>(null);
+  // Mobile only: the lead whose overflow action sheet is open, and the lead
+  // being edited from it. ResourceListPage owns the *create* dialog, so an edit
+  // launched from the card needs its own LeadDialog instance.
+  const [moreFor, setMoreFor] = useState<Lead | null>(null);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
 
   /**
    * Record the attempt. `outcome` is undefined when the user dismisses the
@@ -174,22 +225,44 @@ export function LeadListPage() {
 
   // Only dead leads may be bulk-cleared, matching the server-side allowlist.
 
+  /**
+   * How many filters are narrowing the list, ignoring search.
+   *
+   * Search is excluded because it has its own always-visible box on mobile; the
+   * rest live in a sheet, and this number on the Filters button is the only
+   * thing telling someone the list is filtered at all. Without it, a lead that
+   * is simply outside the current date range looks like a lead that is missing.
+   */
+  const activeFilterCount = [
+    status,
+    source,
+    location.trim(),
+    minQty,
+    maxQty,
+    startDate,
+    endDate,
+    callFilter,
+  ].filter(Boolean).length;
+
   return (
     <>
-      {/* Point 7 — import with the data-format instructions shown first. */}
-      {(role === "admin" || role === "manager") && (
-        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <button
-            onClick={() => setImportOpen(true)}
-            data-testid="open-lead-import"
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            <Upload className="h-4 w-4" /> Import Leads
-          </button>
-        </div>
-      )}
-
       <ResourceListPage<Lead, LeadListQuery>
+        /* Point 7 — import with the data-format instructions shown first. */
+        headerActions={
+          role === "admin" || role === "manager" ? (
+            <button
+              onClick={() => setImportOpen(true)}
+              data-testid="open-lead-import"
+              aria-label="Import Leads"
+              title="Import Leads"
+              className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-1.5"
+            >
+              <Upload className="h-4 w-4" />
+              <span className="hidden md:inline">Import Leads</span>
+            </button>
+          ) : undefined
+        }
+        activeFilterCount={activeFilterCount}
         title="Leads"
         subtitle="Generator enquiries and the lead-to-sale pipeline"
         newButtonText="New Lead"
@@ -392,27 +465,52 @@ export function LeadListPage() {
               }
             : undefined
         }
-        renderFilters={({ search, setSearch }) => (
-          <div className="pg-tile flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[220px]">
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Customer, mobile, city, requirement..."
-                className={filterInputCls}
-              />
-            </div>
+        renderFilters={({ search, setSearch, layout }) => (
+          /*
+            Inline on desktop, stacked in the sheet on mobile. `items-end` and
+            the min-widths only make sense in a row — inside a 358px sheet they
+            leave every control at a different width for no reason.
+          */
+          <div
+            className={layout === "sheet" ? "space-y-4" : "pg-tile flex flex-wrap items-end gap-3"}
+          >
+            {/*
+              Search is omitted in the sheet: the list already renders it in the
+              sticky toolbar, where it stays reachable while the sheet is shut.
+            */}
+            {layout === "inline" && (
+              <div className="flex-1 min-w-[220px]">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Search
+                </label>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Customer, mobile, city, requirement..."
+                  className={filterInputCls}
+                />
+              </div>
+            )}
 
             {/*
               Calling filter — SRS 3.2. A segmented control rather than a select
               because these four are the whole vocabulary and a salesperson
               flips between them constantly; a dropdown costs two clicks each
               time to show four options.
+
+              On mobile the four segments became a two-line block — "Not called"
+              wrapped inside its own segment — so there they are a scrolling chip
+              strip instead: same four options, one line, no wrap.
             */}
             <div>
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Calls</span>
-              <div className="inline-flex overflow-hidden rounded-lg border border-input">
+              <div
+                className={
+                  layout === "sheet"
+                    ? "pg-chips"
+                    : "inline-flex overflow-hidden rounded-lg border border-input"
+                }
+              >
                 {(
                   [
                     { key: "", label: "All" },
@@ -427,11 +525,15 @@ export function LeadListPage() {
                     data-testid={`call-filter-${opt.key || "all"}`}
                     aria-pressed={callFilter === opt.key}
                     onClick={() => setCallFilter(opt.key)}
-                    className={`px-3 py-2 text-sm font-medium transition-colors ${
-                      callFilter === opt.key
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
+                    className={
+                      layout === "sheet"
+                        ? "pg-chip"
+                        : `px-3 py-2 text-sm font-medium transition-colors ${
+                            callFilter === opt.key
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                          }`
+                    }
                   >
                     {opt.label}
                   </button>
@@ -465,7 +567,7 @@ export function LeadListPage() {
                   value={minQty}
                   onChange={(e) => setMinQty(e.target.value)}
                   placeholder="Min"
-                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                  className={`${filterInputCls} no-spinner flex-1 text-right tabular-nums md:w-20 md:flex-none`}
                 />
                 <span className="text-muted-foreground">–</span>
                 <input
@@ -475,7 +577,7 @@ export function LeadListPage() {
                   value={maxQty}
                   onChange={(e) => setMaxQty(e.target.value)}
                   placeholder="Max"
-                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                  className={`${filterInputCls} no-spinner flex-1 text-right tabular-nums md:w-20 md:flex-none`}
                 />
               </div>
             </div>
@@ -490,7 +592,7 @@ export function LeadListPage() {
                   data-testid="lead-start-date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className={`${filterInputCls} w-[140px]`}
+                  className={`${filterInputCls} min-w-0 flex-1 md:w-[140px] md:flex-none`}
                 />
                 <span className="text-muted-foreground">–</span>
                 <input
@@ -499,7 +601,7 @@ export function LeadListPage() {
                   data-testid="lead-end-date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className={`${filterInputCls} w-[140px]`}
+                  className={`${filterInputCls} min-w-0 flex-1 md:w-[140px] md:flex-none`}
                 />
               </div>
             </div>
@@ -642,6 +744,97 @@ export function LeadListPage() {
             )}
           </div>
         )}
+        /*
+          The lead as a card.
+
+          The table carries twelve columns across 1500px; a phone gets the four
+          facts someone standing in front of a customer actually needs — who,
+          where, how big, how much — plus the status, and then the two actions
+          that are the whole point of having the CRM on a phone at all.
+
+          Call and WhatsApp are promoted onto the card because they were the
+          hardest things to reach in the old layout and the most used: both were
+          26px icon buttons at the far right of a 1500px row, so getting to
+          either meant panning sideways past nine columns. Everything else —
+          edit, quote, follow-ups, timeline, convert — is one tap away under
+          "More", which keeps the card to one decision.
+        */
+        renderMobileCard={(lead) => (
+          <RecordCard
+            to={`/leads/${lead.id}`}
+            disc={initialsOf(lead.customerName)}
+            title={lead.customerName}
+            amount={lead.estimatedValue ? formatCurrency(lead.estimatedValue) : undefined}
+            meta={[
+              lead.city,
+              lead.requiredKva ? `${lead.requiredKva} kVA` : null,
+              lead.quantity && lead.quantity > 1 ? `×${lead.quantity}` : null,
+              lead.mobile ? <span className="font-mono tabular-nums">{lead.mobile}</span> : null,
+              /*
+                "The lead view must clearly display which employee initiated the
+                action" (SRS 3.2) — the requirement applies on a phone too, and
+                the card is the only place it can live now the column is gone.
+              */
+              lead.lastCallByName ? (
+                <span
+                  className={
+                    lead.lastCallOutcome === "connected"
+                      ? "text-success"
+                      : lead.lastCallOutcome
+                        ? "text-warning"
+                        : undefined
+                  }
+                >
+                  {lead.lastCallOutcome ? CALL_OUTCOME_LABELS[lead.lastCallOutcome] : "Called"} ·{" "}
+                  {lead.lastCallByName}
+                </span>
+              ) : null,
+              lead.nextFollowUpDate ? (
+                <span className="text-primary">Follow up {formatDate(lead.nextFollowUpDate)}</span>
+              ) : null,
+            ]}
+            badge={
+              <span
+                className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${LEAD_STATUS_COLORS[lead.status]}`}
+              >
+                {LEAD_STATUS_LABELS[lead.status]}
+              </span>
+            }
+            actions={
+              <>
+                <CardAction
+                  icon={Phone}
+                  label="Call"
+                  href={lead.mobile ? `tel:${lead.mobile}` : undefined}
+                  disabled={!lead.mobile}
+                  data-testid={`call-${lead.id}`}
+                  // Same contract as the desktop row: opening the dialler starts
+                  // the call, the outcome is asked for when the user comes back.
+                  // Recording "connected" here would invert the answered figures.
+                  onClick={() => lead.mobile && setCallOutcomeFor(lead)}
+                />
+                <CardAction
+                  icon={MessageCircle}
+                  label="WhatsApp"
+                  tone="whatsapp"
+                  data-testid={`whatsapp-${lead.id}`}
+                  onClick={() => setSendTo({ lead, channel: "whatsapp" })}
+                />
+                <button
+                  type="button"
+                  aria-label="More actions"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMoreFor(lead);
+                  }}
+                  className="pg-tap flex shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </>
+            }
+          />
+        )}
         renderDialog={({ open, onOpenChange, mode, value, onSuccess }) => (
           <LeadDialog
             open={open}
@@ -651,6 +844,94 @@ export function LeadListPage() {
             onSuccess={onSuccess}
           />
         )}
+      />
+
+      {/*
+        The rest of a lead's actions, on mobile.
+
+        A card cannot carry eight buttons, and a row of eight 26px icons is what
+        the desktop table does only because it has 1500px to do it in. These are
+        the same actions, at full touch size, one tap behind the card.
+      */}
+      <Sheet
+        open={Boolean(moreFor)}
+        onOpenChange={(o) => !o && setMoreFor(null)}
+        title={moreFor?.customerName ?? "Lead"}
+      >
+        {moreFor && (
+          <div className="space-y-1">
+            <SheetAction
+              icon={Pencil}
+              label="Edit lead"
+              onClick={() => {
+                setEditLead(moreFor);
+                setMoreFor(null);
+              }}
+            />
+            <SheetAction
+              icon={FileText}
+              label="Create quotation"
+              onClick={() => {
+                setQuotePrefill(leadToQuotationPrefill(moreFor));
+                setQuoteOpen(true);
+                setMoreFor(null);
+              }}
+            />
+            <SheetAction
+              icon={Mail}
+              label="Send email"
+              disabled={!moreFor.email}
+              onClick={() => {
+                setSendTo({ lead: moreFor, channel: "email" });
+                setMoreFor(null);
+              }}
+            />
+            <SheetAction
+              icon={MessageSquare}
+              label={
+                moreFor.followUps.length > 0
+                  ? `Follow-ups (${moreFor.followUps.length})`
+                  : "Follow-ups"
+              }
+              onClick={() => {
+                setFollowLead(moreFor);
+                setFollowOpen(true);
+                setMoreFor(null);
+              }}
+            />
+            <SheetAction
+              icon={History}
+              label="Activity timeline"
+              onClick={() => {
+                setTimelineLead(moreFor);
+                setTimelineOpen(true);
+                setMoreFor(null);
+              }}
+            />
+            {moreFor.status !== "converted" && moreFor.status !== "not_interested" && (
+              <SheetAction
+                icon={CheckCircle2}
+                label="Convert to sale"
+                tone="primary"
+                onClick={() => {
+                  setConvertLead(moreFor);
+                  setConvertOpen(true);
+                  setMoreFor(null);
+                }}
+              />
+            )}
+          </div>
+        )}
+      </Sheet>
+
+      {/* Edit, reached from the card's More sheet — ResourceListPage owns the
+          create dialog, so the mobile edit path needs its own instance. */}
+      <LeadDialog
+        open={Boolean(editLead)}
+        onOpenChange={(o) => !o && setEditLead(null)}
+        mode="edit"
+        value={editLead}
+        onSuccess={() => setEditLead(null)}
       />
 
       <FollowUpDialog

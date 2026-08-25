@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { MobileTabBar } from "./MobileTabBar";
 import { SidebarProvider } from "./sidebarContext";
 import { PageLoader } from "@/shared/components/PageLoader";
 
@@ -12,12 +13,19 @@ export function AppLayout() {
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar />
-          <main className="flex-1 overflow-auto p-4 md:p-6 bg-background">
+          {/*
+            `pb-24` below md clears the fixed tab bar and the FAB that sits above
+            it. Without it the last card on every list is permanently hidden
+            behind the bar — the classic bottom-navigation bug, and the one that
+            makes users think a list is truncated.
+          */}
+          <main className="flex-1 overflow-auto bg-background p-4 pb-24 md:p-6 md:pb-6">
             <Suspense fallback={<PageLoader />}>
               <Outlet />
             </Suspense>
           </main>
         </div>
+        <MobileTabBar />
       </div>
     </SidebarProvider>
   );

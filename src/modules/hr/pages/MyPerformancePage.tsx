@@ -163,7 +163,9 @@ export function MyPerformancePage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Two-up on a phone, as on the dashboard — four figures on one screen
+          instead of four screenfuls of one figure each. */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="Payable Days"
           value={data.pay.payableDays}

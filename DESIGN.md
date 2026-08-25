@@ -175,9 +175,81 @@ rebuilt outright. Rules:
 - Copy names the business and the work. "The modern way to run a generator sales
   & service business" could be any product; delete that sentence class.
 
+## Mobile
+
+Added 25 Aug 2026, after the client saw the product on a phone. Everything above
+still holds; this is what changes below Tailwind's `md` (768px), which is the
+single breakpoint the mobile layer switches on — `useIsMobile()`.
+
+The desktop layout was inherited unchanged by the phone, and a layout tuned for
+1,440px does not degrade gracefully to 390px. It failed in four measurable ways:
+list tables 800–1,500px wide inside a 390px window; ~1,200px of filter form
+above the first record on Leads; touch targets of 26px against a 44px standard;
+and navigation behind a hamburger in the top-left corner, the furthest point on
+the screen from a right thumb.
+
+> **The phone gets a second layout for the same data, not a re-skin.**
+
+### The rules
+
+- **Below `md` a list is cards, not a table.** A table works by aligning a
+  column so the eye can run down it, and that mechanism needs width. At 390px
+  there is none, so a table degrades into sideways panning — which keeps the
+  cost (only three columns visible) and loses the benefit (comparing figures
+  seen at once). `RecordCard` gives the alignment up deliberately and keeps each
+  record whole. `ResourceListPage` takes a `renderMobileCard`; define one per
+  screen, because only the page knows which two facts actually matter.
+- **Navigation lives at the bottom edge** (`MobileTabBar`): four destinations
+  ranked by daily reach, plus a More sheet. Four because a fifth label truncates
+  at 390px, and "Quotati…" next to "Quantit…" is worse than no fifth tab. Role
+  filtering comes from `menu.ts` — the bar is a view onto the sidebar's menu,
+  never a second copy of it. **The desktop sidebar is unchanged**; the rule above
+  against redesigning the shell still applies to it.
+- **Filters go behind a sheet, search stays out.** Search is the one filter used
+  often enough to earn permanent space. Whatever is hidden must report an
+  **active count** on the Filters button — a silently filtered list reads as a
+  list with records missing.
+- **Every interactive control is at least 44px** (`.pg-tap`), which grows the hit
+  box without changing how large the glyph looks.
+- **One FAB per screen**, for the single primary create action. A second FAB
+  means the screen has no primary action and the pattern is wrong for it.
+- **Forms are bottom sheets** (`Sheet`, and `FormDialog` switches automatically).
+  A centred `max-w-lg` dialog leaves ~350px of usable width at 390px and puts
+  Save in the vertical middle, the part of the screen a thumb reaches last.
+- **A stacked input field is labelled in place.** Column headers that scroll away
+  are acceptable on a wide read-only grid and never on a form: an unlabelled
+  numeric box could be rate, discount or GST, and on a document that becomes a
+  tax invoice that ambiguity is expensive.
+- **Chip strips scroll, they do not wrap** (`.pg-chips`). A wrapped row of tabs
+  costs vertical space on every screen; a scrolling one costs a gesture on the
+  rare occasion you need the last chip.
+- **Long rupee figures use `formatCurrencyCompact`** in stat tiles only —
+  `₹23.4L` rather than `₹23,45,000.00`, which is wider than a half-width tile and
+  wrapped mid-number. Tables, quotations and invoices stay exact to the paisa.
+- **Identity discs are `bg-muted`, never tinted.** A coloured disc per record is
+  the banned decorative icon tile in a new costume, and it spends colour on
+  ornament where colour means status.
+
+### What the reference advert did and did not settle
+
+The client sent a mobile-dialer advert as the brief. Its **structure** — bottom
+bar, card rows, call and message on the record — is the standard mobile-CRM
+grammar and is adopted here. Its **colouring** is not: a coloured chip on every
+element would undo the colour-discipline rule, which is the rule that answered
+the original "looks machine-made" complaint. Colour still means status.
+
+### Verification
+
+`e2e/capture-mobile.spec.ts` drives every route at 390×844 and writes a
+`metrics.json` recording horizontal overflow per route. Run it before and after
+any mobile change; `scripts/build-mobile-report.mjs` pairs the two sets into the
+client-facing PDF.
+
 ## Motion
 
 - Transitions on colour and transform only, 150–200ms. No fade-and-rise on
   mount.
 - Nothing animates on a data table. Rows appearing with a stagger is a
   screenshot feature and a usability cost.
+- A bottom sheet may translate on drag — that is direct manipulation, not
+  decoration: the sheet follows the finger and is released at ~110px.

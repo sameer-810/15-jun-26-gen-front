@@ -44,19 +44,34 @@ const TONE_VALUE: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, hint, tone = "neutral", className }: StatCardProps) {
   return (
-    <div className={cn("pg-panel px-4 py-3.5", className)}>
-      <p className="truncate text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+    <div className={cn("pg-panel px-3 py-3 md:px-4 md:py-3.5", className)}>
+      {/*
+        `break-words` rather than `truncate` on the label: two-up on a phone the
+        tile is ~171px, and "Sales This Month" truncated to "Sales This M…" is a
+        worse trade than a second line. The label is the part that says what the
+        number means.
+      */}
+      <p className="break-words text-[11px] font-medium uppercase leading-tight tracking-[0.06em] text-muted-foreground md:truncate md:text-xs md:tracking-[0.08em]">
         {label}
       </p>
+      {/*
+        The figure steps down to 1.25rem on a phone. At 1.6rem a formatted rupee
+        amount — ₹23,45,000.00, fourteen mono glyphs — is wider than a half-width
+        tile and spilled past its own border.
+      */}
       <p
         className={cn(
-          "mt-2 font-mono text-[1.6rem] font-semibold leading-none tracking-tight tabular-nums",
+          "mt-1.5 break-all font-mono text-xl font-semibold leading-none tracking-tight tabular-nums md:mt-2 md:break-normal md:text-[1.6rem]",
           TONE_VALUE[tone],
         )}
       >
         {value}
       </p>
-      {hint && <p className="mt-2 text-xs font-light text-muted-foreground">{hint}</p>}
+      {hint && (
+        <p className="mt-1.5 text-[11px] font-light leading-tight text-muted-foreground md:mt-2 md:text-xs">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

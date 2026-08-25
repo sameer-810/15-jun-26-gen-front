@@ -196,9 +196,10 @@ export function SettingsPage() {
   return (
     <div className="erp-page max-w-4xl">
       <div className="flex items-center gap-2">
-        <Building2 className="h-5 w-5 text-primary" />
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Settings</h1>
+        <Building2 className="hidden h-5 w-5 text-primary md:block" />
+        <div className="min-w-0">
+          {/* The top bar already names the screen on mobile. */}
+          <h1 className="hidden text-xl font-bold text-foreground md:block">Settings</h1>
           <p className="text-sm text-muted-foreground">
             Company details used on quotations, proforma invoices, and GST breakup
           </p>

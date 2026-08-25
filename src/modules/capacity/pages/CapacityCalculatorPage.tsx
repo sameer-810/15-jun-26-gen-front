@@ -9,8 +9,9 @@ import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog"
 import type { ProductOption } from "@/modules/product/types";
 import type { QuotationPrefill } from "@/modules/quotation/types";
 import { getApiErrorMessage } from "@/shared/api/http";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "@/shared/lib/toast";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 
 const CATEGORY_LABELS: Record<ApplianceCategory, string> = {
   lighting: "Lighting",
@@ -50,6 +51,7 @@ function describeLoad(result: CapacityResult): string {
 }
 
 export function CapacityCalculatorPage() {
+  const isMobile = useIsMobile();
   const [params] = useSearchParams();
   // Reached from a lead's "Calculate" button — the quotation then carries the
   // customer through, so nothing is retyped (point 4: calculate, then quote).
@@ -125,9 +127,11 @@ export function CapacityCalculatorPage() {
   return (
     <div className="erp-page max-w-5xl">
       <div className="flex items-center gap-2">
-        <Calculator className="h-5 w-5 text-primary" />
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Generator Capacity Calculator</h1>
+        <Calculator className="hidden h-5 w-5 text-primary md:block" />
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-bold text-foreground md:block">
+            Generator Capacity Calculator
+          </h1>
           <p className="text-sm text-muted-foreground">
             Enter the connected load to get a recommended genset size (with motor start-up surge and
             safety margin), then quote it
@@ -140,8 +144,97 @@ export function CapacityCalculatorPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="overflow-auto">
+      <div className="pg-tile">
+        {/*
+          The load list, stacked below `md`.
+
+          This is a table of *inputs*, which is the worst kind to leave scrolling
+          sideways: you cannot fill in a field you cannot see, and the column
+          headers that say what each box means scroll away with it. One block per
+          appliance instead, with every field labelled in place.
+        */}
+        {isMobile && (
+          <div className="space-y-3">
+            {rows.map((row, i) => (
+              <div key={i} className="rounded-lg border border-border p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Appliance <span className="font-mono tabular-nums">{i + 1}</span>
+                  </span>
+                  {/* Calm by default, destructive on contact. A red glyph on
+                      every block trains the eye to stop reading red as a
+                      warning — see DESIGN.md on row actions. */}
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="pg-tap -mr-1 flex items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive active:text-destructive"
+                    aria-label={`Remove appliance ${i + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Category
+                    </span>
+                    <select
+                      className={inputCls}
+                      value={row.category}
+                      onChange={(e) =>
+                        updateRow(i, { category: e.target.value as ApplianceCategory })
+                      }
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORY_LABELS[c]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                      Appliance
+                    </span>
+                    <input
+                      className={inputCls}
+                      value={row.name}
+                      placeholder="e.g. Submersible pump"
+                      onChange={(e) => updateRow(i, { name: e.target.value })}
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <label className="block flex-1">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Qty
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        className={`${inputCls} no-spinner tabular-nums`}
+                        value={row.quantity}
+                        onChange={(e) => updateRow(i, { quantity: Number(e.target.value) })}
+                      />
+                    </label>
+                    <label className="block flex-1">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Watts (each)
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        className={`${inputCls} no-spinner tabular-nums`}
+                        value={row.watts}
+                        onChange={(e) => updateRow(i, { watts: Number(e.target.value) })}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className={cn("overflow-auto", isMobile && "hidden")}>
           <table className="w-full text-sm min-w-[640px]">
             <thead className="text-left text-xs text-muted-foreground">
               <tr>
@@ -213,7 +306,7 @@ export function CapacityCalculatorPage() {
 
         <button
           onClick={addRow}
-          className="mt-2 flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors"
+          className="pg-tap mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-border text-sm font-medium transition-colors hover:bg-accent md:mt-2 md:min-h-0 md:w-auto md:px-3 md:py-1.5"
         >
           <Plus className="h-4 w-4" /> Add appliance
         </button>

@@ -1,21 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-
-/** Human labels for path segments. 24-hex ids render as "Details". */
-const LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
-  leads: "Leads",
-  "capacity-calculator": "Capacity Calculator",
-  quotations: "Quotations & PI",
-  inventory: "Inventory",
-  sales: "Sales",
-  reports: "Reports",
-  activity: "Activity Log",
-  settings: "Settings",
-  users: "Users",
-};
-
-const isId = (s: string) => /^[a-f\d]{24}$/i.test(s);
+import { PATH_LABELS, isObjectId } from "./pageLabels";
 
 export function Breadcrumbs() {
   const { pathname } = useLocation();
@@ -25,7 +10,7 @@ export function Breadcrumbs() {
     segments.length === 0 || segments[0] === "dashboard"
       ? [{ label: "Dashboard", to: "/dashboard", last: true }]
       : segments.map((seg, i) => ({
-          label: isId(seg) ? "Details" : (LABELS[seg] ?? seg),
+          label: isObjectId(seg) ? "Details" : (PATH_LABELS[seg] ?? seg),
           to: "/" + segments.slice(0, i + 1).join("/"),
           last: i === segments.length - 1,
         }));

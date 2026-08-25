@@ -1,13 +1,17 @@
 import { useState } from "react";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2, Search, SlidersHorizontal } from "lucide-react";
 import { useSales, useDeleteSale } from "../hooks/useSales";
 import { SaleDialog } from "../components/SaleDialog";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, initialsOf } from "@/lib/utils";
 import { PageLoader } from "@/shared/components/PageLoader";
 import { LocationSelect } from "@/modules/location/LocationSelect";
+import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { FilterShell } from "@/shared/components/FilterShell";
+import { Fab } from "@/shared/components/Fab";
+import { RecordCard } from "@/shared/components/RecordCard";
 
 const filterInputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
@@ -31,6 +35,12 @@ export function SaleListPage() {
   const [endDate, setEndDate] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const isMobile = useIsMobile();
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  // Search excluded — it keeps its own always-visible box on mobile.
+  const activeFilterCount = [location.trim(), minQty, maxQty, startDate, endDate].filter(
+    Boolean,
+  ).length;
 
   const { data, isLoading, refetch } = useSales({
     search: search || undefined,
@@ -60,23 +70,27 @@ export function SaleListPage() {
   return (
     <div className="erp-page">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">Sales</h1>
+        <div className="min-w-0">
+          <h1 className="hidden text-xl font-bold text-foreground md:block">Sales</h1>
           <p className="text-sm text-muted-foreground">
-            Completed generator sales · {total} records · page value {formatCurrency(monthValue)}
+            <span className="hidden md:inline">Completed generator sales · </span>
+            <span className="font-mono tabular-nums">{total}</span> records
+            <span className="hidden md:inline"> · page value {formatCurrency(monthValue)}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
+            aria-label="Refresh"
+            className="pg-tap flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:min-h-0 md:min-w-0 md:border md:border-border md:bg-card md:px-3 md:py-2 md:text-foreground"
           >
-            <RefreshCw className="h-4 w-4" /> Refresh
+            <RefreshCw className="h-4 w-4" />
+            <span className="hidden md:inline">Refresh</span>
           </button>
           {canRecord && (
             <button
               onClick={() => setDialogOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 shadow-sm transition-colors"
+              className="hidden items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:flex"
             >
               <Plus className="h-4 w-4" /> Record Sale
             </button>
@@ -84,8 +98,54 @@ export function SaleListPage() {
         </div>
       </div>
 
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[220px]">
+      {/*
+        Search stays on screen; location, quantity and the date window move into
+        a sheet below `md`. Inline they were four stacked controls and ~600px of
+        form on a screen whose job is to show sales.
+      */}
+      {isMobile && (
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              id="sale-search-mobile"
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Customer or model..."
+              aria-label="Search sales"
+              className="h-11 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setFilterSheetOpen(true)}
+            aria-label="Filters"
+            className={cn(
+              "pg-tap flex shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors",
+              activeFilterCount > 0
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground",
+            )}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {activeFilterCount > 0 && (
+              <span className="font-mono tabular-nums">{activeFilterCount}</span>
+            )}
+          </button>
+        </div>
+      )}
+
+      <FilterShell
+        isMobile={isMobile}
+        open={filterSheetOpen}
+        onOpenChange={setFilterSheetOpen}
+        total={total}
+      >
+        <div className={isMobile ? "hidden" : "flex-1 min-w-[220px]"}>
           <label
             className="block text-xs font-medium text-muted-foreground mb-1"
             htmlFor="sale-search"
@@ -103,7 +163,7 @@ export function SaleListPage() {
             className={filterInputCls}
           />
         </div>
-        <div className="min-w-[150px]">
+        <div className="md:min-w-[150px]">
           <label
             className="block text-xs font-medium text-muted-foreground mb-1"
             htmlFor="sale-location-filter"
@@ -181,14 +241,57 @@ export function SaleListPage() {
                 setEndDate(e.target.value);
                 setPage(1);
               }}
-              className={`${filterInputCls} w-[140px]`}
+              className={`${filterInputCls} min-w-0 flex-1 md:w-[140px] md:flex-none`}
             />
           </div>
         </div>
-      </div>
+      </FilterShell>
 
       {isLoading ? (
         <PageLoader />
+      ) : isMobile ? (
+        /*
+          Sales as cards.
+
+          Nine columns across 1100px becomes: who bought it, what they bought,
+          and what it came to. Unit price and the CGST/SGST split are desk
+          figures — someone checking a sale on a phone wants the total.
+        */
+        <div className="space-y-2">
+          {sales.length === 0 ? (
+            <p className="pg-panel px-4 py-12 text-center text-sm text-muted-foreground">
+              No sales recorded yet.
+            </p>
+          ) : (
+            sales.map((s) => (
+              <RecordCard
+                key={s.id}
+                disc={initialsOf(s.customerName)}
+                title={s.customerName}
+                amount={formatCurrency(s.totalAmount)}
+                meta={[
+                  s.modelName,
+                  s.kva ? `${s.kva} kVA` : null,
+                  s.quantity > 1 ? `×${s.quantity}` : null,
+                  s.location,
+                  formatDate(s.saleDate),
+                  s.salesExecutiveName || s.salesExecutive?.name,
+                ]}
+                actions={
+                  canDelete ? (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDelete(s.id)}
+                      className="pg-tap flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-border text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Void sale
+                    </button>
+                  ) : undefined
+                }
+              />
+            ))
+          )}
+        </div>
       ) : (
         // This page predates the shared ResourceListPage, so it carried the old
         // table styling. Brought in line with every other list: pinned header,
@@ -285,22 +388,25 @@ export function SaleListPage() {
           <button
             disabled={!data.meta.hasPrevPage}
             onClick={() => setPage((p) => p - 1)}
-            className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40 hover:bg-accent"
+            className="pg-tap rounded-lg border border-border px-3 hover:bg-accent disabled:opacity-40 md:min-h-0 md:min-w-0 md:py-1.5"
           >
             Prev
           </button>
           <span className="text-muted-foreground">
-            Page {page} of {data.meta.totalPages}
+            Page <span className="font-mono tabular-nums">{page}</span> of{" "}
+            <span className="font-mono tabular-nums">{data.meta.totalPages}</span>
           </span>
           <button
             disabled={!data.meta.hasNextPage}
             onClick={() => setPage((p) => p + 1)}
-            className="rounded-lg border border-border px-3 py-1.5 disabled:opacity-40 hover:bg-accent"
+            className="pg-tap rounded-lg border border-border px-3 hover:bg-accent disabled:opacity-40 md:min-h-0 md:min-w-0 md:py-1.5"
           >
             Next
           </button>
         </div>
       )}
+
+      {canRecord && <Fab label="Record Sale" onClick={() => setDialogOpen(true)} />}
 
       <SaleDialog open={dialogOpen} onOpenChange={setDialogOpen} onSuccess={() => refetch()} />
 

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Pencil, PackagePlus, Download, Upload, Trash2 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
+import { RecordCard, CardAction } from "@/shared/components/RecordCard";
 import { LocationSelect } from "@/modules/location/LocationSelect";
 import { InventoryDialog } from "../components/InventoryDialog";
 import { AddStockDialog } from "../components/AddStockDialog";
@@ -22,7 +23,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { Inventory, InventoryListQuery, FuelType } from "../types";
 
 const filterSelectCls =
-  "rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
+  "w-full md:w-auto rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 const filterInputCls =
   "w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 
@@ -83,32 +84,52 @@ export function InventoryListPage() {
     }
   }
 
+  // Search excluded — it keeps its own always-visible box on mobile.
+  const activeFilterCount = [
+    fuelType,
+    lowOnly,
+    location.trim(),
+    minQty,
+    maxQty,
+    startDate,
+    endDate,
+  ].filter(Boolean).length;
+
   return (
     <>
-      {canManage && (
-        <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            onChange={onFileChosen}
-            className="hidden"
-          />
-          <button
-            onClick={onImportClick}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
-          >
-            <Upload className="h-4 w-4" /> Import Excel
-          </button>
-          <button
-            onClick={onExport}
-            className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent transition-colors"
-          >
-            <Download className="h-4 w-4" /> Export Excel
-          </button>
-        </div>
-      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={onFileChosen}
+        className="hidden"
+      />
       <ResourceListPage<Inventory, InventoryListQuery>
+        activeFilterCount={activeFilterCount}
+        headerActions={
+          canManage ? (
+            <>
+              <button
+                onClick={onImportClick}
+                aria-label="Import Excel"
+                title="Import Excel"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden md:inline">Import Excel</span>
+              </button>
+              <button
+                onClick={onExport}
+                aria-label="Export Excel"
+                title="Export Excel"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden md:inline">Export Excel</span>
+              </button>
+            </>
+          ) : undefined
+        }
         title="Inventory"
         subtitle="Generator models in stock"
         newButtonText="New Model"
@@ -166,18 +187,26 @@ export function InventoryListPage() {
           page,
           limit,
         })}
-        renderFilters={({ search, setSearch }) => (
-          <div className="rounded-xl border border-border bg-card p-4 shadow-sm flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[220px]">
-              <label className="block text-xs font-medium text-muted-foreground mb-1">Search</label>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Model or brand..."
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
-              />
-            </div>
-            <div className="min-w-[150px]">
+        renderFilters={({ search, setSearch, layout }) => (
+          /* `rounded-xl … shadow-sm` was an in-page panel claiming elevation it
+             has not earned — `pg-tile` is the house primitive. See DESIGN.md. */
+          <div
+            className={layout === "sheet" ? "space-y-4" : "pg-tile flex flex-wrap items-end gap-3"}
+          >
+            {layout === "inline" && (
+              <div className="flex-1 min-w-[220px]">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">
+                  Search
+                </label>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Model or brand..."
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+                />
+              </div>
+            )}
+            <div className="md:min-w-[150px]">
               <label
                 className="block text-xs font-medium text-muted-foreground mb-1"
                 htmlFor="inventory-location-filter"
@@ -205,7 +234,7 @@ export function InventoryListPage() {
                   value={minQty}
                   onChange={(e) => setMinQty(e.target.value)}
                   placeholder="Min"
-                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                  className={`${filterInputCls} no-spinner flex-1 text-right tabular-nums md:w-20 md:flex-none`}
                 />
                 <span className="text-muted-foreground">–</span>
                 <input
@@ -215,7 +244,7 @@ export function InventoryListPage() {
                   value={maxQty}
                   onChange={(e) => setMaxQty(e.target.value)}
                   placeholder="Max"
-                  className={`${filterInputCls} no-spinner w-20 text-right tabular-nums`}
+                  className={`${filterInputCls} no-spinner flex-1 text-right tabular-nums md:w-20 md:flex-none`}
                 />
               </div>
             </div>
@@ -231,7 +260,7 @@ export function InventoryListPage() {
                   data-testid="inventory-start-date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className={`${filterInputCls} w-[140px]`}
+                  className={`${filterInputCls} min-w-0 flex-1 md:w-[140px] md:flex-none`}
                 />
                 <span className="text-muted-foreground">–</span>
                 <input
@@ -240,7 +269,7 @@ export function InventoryListPage() {
                   data-testid="inventory-end-date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className={`${filterInputCls} w-[140px]`}
+                  className={`${filterInputCls} min-w-0 flex-1 md:w-[140px] md:flex-none`}
                 />
               </div>
             </div>
@@ -265,12 +294,12 @@ export function InventoryListPage() {
                 ))}
               </select>
             </div>
-            <label className="flex items-center gap-2 text-sm text-foreground pb-2">
+            <label className="pg-tap flex items-center gap-2 text-sm text-foreground md:min-h-0 md:pb-2">
               <input
                 type="checkbox"
                 checked={lowOnly}
                 onChange={(e) => setLowOnly(e.target.checked)}
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="h-5 w-5 rounded border-input accent-primary md:h-4 md:w-4"
               />
               Low stock only
             </label>
@@ -307,6 +336,53 @@ export function InventoryListPage() {
               )
             : () => <span className="text-xs text-muted-foreground">View only</span>
         }
+        /*
+          Stock as a card. Availability is the figure this screen exists to
+          answer, so it takes the amount slot; price sits in the meta line, and
+          "sold" drops off entirely — it is a reporting number, not something
+          checked from a warehouse floor.
+        */
+        renderMobileCard={(i, { onEdit }) => (
+          <RecordCard
+            onClick={canManage ? () => onEdit(i) : undefined}
+            title={i.model}
+            amount={
+              <span className={i.availableQuantity === 0 ? "text-destructive" : undefined}>
+                {i.availableQuantity} left
+              </span>
+            }
+            meta={[
+              i.brand,
+              `${i.kva} kVA`,
+              FUEL_LABELS[i.fuelType],
+              PHASE_LABELS[i.phase],
+              i.location,
+              i.sellingPrice ? formatCurrency(i.sellingPrice) : null,
+            ]}
+            badge={
+              <span
+                className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${STOCK_STATUS_COLORS[i.stockStatus]}`}
+              >
+                {STOCK_STATUS_LABELS[i.stockStatus]}
+              </span>
+            }
+            actions={
+              canManage ? (
+                <>
+                  <CardAction icon={Pencil} label="Edit" onClick={() => onEdit(i)} />
+                  <CardAction
+                    icon={PackagePlus}
+                    label="Add stock"
+                    onClick={() => {
+                      setStockItem(i);
+                      setStockOpen(true);
+                    }}
+                  />
+                </>
+              ) : undefined
+            }
+          />
+        )}
         hideActionsColumn={false}
         renderDialog={
           canManage

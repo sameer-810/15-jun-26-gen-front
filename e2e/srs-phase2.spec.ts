@@ -57,7 +57,7 @@ test.describe("R1 — photo attendance", () => {
     await expect(dialog).toContainText(/photo|camera/i);
   });
 
-  test("a punch without a photo is refused", async ({ page }) => {
+  test("a punch without a photo is refused", async () => {
     // Straight at the API: the photo is the entire point of the requirement, so
     // it must not be optional at the boundary regardless of what the UI sends.
     const res = await ctx.post(`${API}/attendance/punch`, { data: {} });

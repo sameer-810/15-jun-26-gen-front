@@ -10,7 +10,7 @@ import { useCreateQuotation, useUpdateQuotation, useCustomerLookup } from "../ho
 import { DEFAULT_TERMS, DOC_TYPE_LABELS, DOC_TYPES } from "../constants/quotation.constants";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, round2 } from "@/lib/utils";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
 import type { ProductOption } from "@/modules/product/types";
 import type { DocType, Quotation, QuotationPrefill } from "../types";
@@ -196,15 +196,19 @@ export function QuotationDialog({
   // matter what was typed. Key on the serialised values instead.
   const itemsKey = JSON.stringify(watchedItems);
   const totals = useMemo(() => {
+    // Rounded per line, exactly as the server's computeTotals does — summing
+    // raw values drifts by a paisa or two from what actually gets saved.
     let taxable = 0;
     let tax = 0;
     (watchedItems || []).forEach((it) => {
       const gross = (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0);
-      const disc = (gross * (Number(it.discountPct) || 0)) / 100;
-      const t = gross - disc;
+      const disc = round2((gross * (Number(it.discountPct) || 0)) / 100);
+      const t = round2(gross - disc);
       taxable += t;
-      tax += (t * (Number(it.taxRate) || 0)) / 100;
+      tax += round2((t * (Number(it.taxRate) || 0)) / 100);
     });
+    taxable = round2(taxable);
+    tax = round2(tax);
     const grand = Math.round(taxable + tax);
     return { taxable, tax, grand };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see itemsKey above

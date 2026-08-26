@@ -11,7 +11,7 @@ import { API, RUN_TAG, adminApi, createLead, sweepRunFixtures, waitForTable } fr
 const SALES = {
   name: `${RUN_TAG} Sales Exec`,
   email: `${RUN_TAG.toLowerCase()}.sales@e2e.test`,
-  password: "Sales@1234",
+  password: "Sales@1234Secure",
   role: "sales",
 };
 

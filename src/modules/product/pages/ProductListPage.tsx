@@ -99,6 +99,7 @@ export function ProductListPage() {
         accept=".xlsx,.xls,.csv"
         onChange={onFileChosen}
         className="hidden"
+        aria-label="Import products from a spreadsheet"
       />
 
       <ResourceListPage<Product, ProductListQuery>

@@ -103,6 +103,7 @@ export function InventoryListPage() {
         accept=".xlsx,.xls,.csv"
         onChange={onFileChosen}
         className="hidden"
+        aria-label="Import inventory from a spreadsheet"
       />
       <ResourceListPage<Inventory, InventoryListQuery>
         activeFilterCount={activeFilterCount}

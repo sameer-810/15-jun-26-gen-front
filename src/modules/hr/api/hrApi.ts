@@ -19,8 +19,13 @@ export type Punch = {
 };
 
 export type AttendanceDay = {
-  id: string;
-  userId: string;
+  /**
+   * Null for a calendar-supplied day with no database row — an unpunched Sunday
+   * or absence. It still counts towards pay, but there is nothing to open.
+   */
+  id: string | null;
+  userId: string | null;
+  isSynthetic?: boolean;
   userName: string;
   date: string;
   firstIn: Punch | null;
@@ -54,24 +59,34 @@ export type MonthlyPerformance = {
   employee: { id: string; name: string; role: string; joiningDate: string | null };
   period: { month: string; from: string; to: string; daysInMonth: number };
   days: AttendanceDay[];
+  /**
+   * False when the reader may see attendance but not the money — a manager
+   * viewing someone else. Salary is admin-or-your-own, as on /auth/users. The
+   * pay fields are then absent rather than zeroed: a zero reads as "earned
+   * nothing", which is worse than saying nothing.
+   */
+  payVisible: boolean;
   pay: {
-    monthlyGross: number;
     daysInMonth: number;
-    dayRate: number;
     payableDays: number;
-    grossEarned: number;
     counts: Partial<Record<AttendanceStatus, number>>;
     unresolvedDays: number;
     overtimeMinutes: number;
+    // Present only when payVisible.
+    monthlyGross?: number;
+    dayRate?: number;
+    grossEarned?: number;
   };
   incentive: {
-    incentiveRate: number;
-    salesValue: number;
-    incentiveEarned: number;
     unitsSold: number;
+    // Present only when payVisible.
+    incentiveRate?: number;
+    salesValue?: number;
+    incentiveEarned?: number;
   };
   targets: TargetRow[];
-  totalEarned: number;
+  /** Present only when payVisible. */
+  totalEarned?: number;
 };
 
 export async function punch(payload: {
@@ -110,6 +125,24 @@ export async function listAttendance(params: {
 export async function resolveDay(id: string, payload: { outAt: string; note?: string }) {
   const res = await http.patch<{ data: AttendanceDay }>(`/attendance/${id}/resolve`, payload);
   return res.data.data;
+}
+
+/** Mark a range as approved leave. `to` is optional. Worked days come back in `skipped`. */
+export async function markLeave(payload: {
+  userId: string;
+  from: string;
+  to?: string;
+  note?: string;
+}) {
+  const res = await http.post<{
+    data: { marked: number; skipped: number };
+    message: string;
+  }>("/attendance/leave", payload);
+  return { ...res.data.data, message: res.data.message };
+}
+
+export async function clearLeave(payload: { userId: string; date: string }) {
+  await http.delete("/attendance/leave", { data: payload });
 }
 
 export async function getMonthly(params: { userId?: string; month?: string }) {

@@ -247,10 +247,13 @@ export function CapacityCalculatorPage() {
             </thead>
             <tbody>
               {rows.map((row, i) => (
+                // The column header is the visible label; there is nowhere for a
+                // per-cell one, so each control names itself and its row.
                 <tr key={i}>
                   <td className="px-2 py-1.5">
                     <select
                       className={inputCls}
+                      aria-label={`Appliance ${i + 1} category`}
                       value={row.category}
                       onChange={(e) =>
                         updateRow(i, { category: e.target.value as ApplianceCategory })
@@ -266,6 +269,7 @@ export function CapacityCalculatorPage() {
                   <td className="px-2 py-1.5">
                     <input
                       className={inputCls}
+                      aria-label={`Appliance ${i + 1} name`}
                       value={row.name}
                       placeholder="e.g. Submersible pump"
                       onChange={(e) => updateRow(i, { name: e.target.value })}
@@ -276,6 +280,7 @@ export function CapacityCalculatorPage() {
                       type="number"
                       min={1}
                       className={inputCls}
+                      aria-label={`Appliance ${i + 1} quantity`}
                       value={row.quantity}
                       onChange={(e) => updateRow(i, { quantity: Number(e.target.value) })}
                     />
@@ -285,6 +290,7 @@ export function CapacityCalculatorPage() {
                       type="number"
                       min={0}
                       className={inputCls}
+                      aria-label={`Appliance ${i + 1} watts each`}
                       value={row.watts}
                       onChange={(e) => updateRow(i, { watts: Number(e.target.value) })}
                     />
@@ -312,10 +318,10 @@ export function CapacityCalculatorPage() {
         </button>
 
         <div className="mt-4 flex flex-wrap items-end gap-4 border-t border-border pt-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
               Power Factor
-            </label>
+            </span>
             <input
               type="number"
               step="0.05"
@@ -325,11 +331,11 @@ export function CapacityCalculatorPage() {
               value={powerFactor}
               onChange={(e) => setPowerFactor(Number(e.target.value))}
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
               Safety Margin (%)
-            </label>
+            </span>
             <input
               type="number"
               min={0}
@@ -338,7 +344,7 @@ export function CapacityCalculatorPage() {
               value={safetyMargin}
               onChange={(e) => setSafetyMargin(Number(e.target.value))}
             />
-          </div>
+          </label>
           <button
             onClick={onCalculate}
             disabled={calc.isPending}

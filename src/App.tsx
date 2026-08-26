@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "./app/layouts/AppLayout";
 import { RequireAuth } from "./app/router/RequireAuth";
+import { NotFoundPage } from "./app/router/NotFoundPage";
 import { PageLoader } from "./shared/components/PageLoader";
 
 const LoginPage = lazy(() =>
@@ -100,9 +101,21 @@ export default function App() {
           <Route path="attendance" element={<AttendanceAdminPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="users" element={<UsersPage />} />
+          {/* Inside the shell, so a wrong URL still leaves you somewhere you
+              can navigate from rather than on a bare page. */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Unauthenticated and unknown: RequireAuth sends them to /login, which
+            is the honest answer for someone not signed in. */}
+        <Route
+          path="*"
+          element={
+            <RequireAuth>
+              <Navigate to="/dashboard" replace />
+            </RequireAuth>
+          }
+        />
       </Routes>
     </Suspense>
   );

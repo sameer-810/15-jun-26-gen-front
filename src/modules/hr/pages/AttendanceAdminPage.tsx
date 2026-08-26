@@ -1,6 +1,13 @@
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
-import { useAttendance, useResolveDay, useSetTarget, useTargets } from "../hooks/useHr";
+import { CheckCircle2, CalendarOff } from "lucide-react";
+import {
+  useAttendance,
+  useResolveDay,
+  useSetTarget,
+  useTargets,
+  useMarkLeave,
+  useClearLeave,
+} from "../hooks/useHr";
 import { useAssignableUsers } from "@/modules/lead/hooks/useLeads";
 import { PageLoader } from "@/shared/components/PageLoader";
 import { getApiErrorMessage } from "@/shared/api/http";
@@ -14,7 +21,7 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",
   half_day: "Half day",
   absent: "Absent",
-  incomplete: "Not logged out",
+  incomplete: "Not punched out",
   leave: "Leave",
   week_off: "Week off",
 };
@@ -62,11 +69,44 @@ export function AttendanceAdminPage() {
   const [outAt, setOutAt] = useState("");
   const [note, setNote] = useState("");
 
+  const markLeave = useMarkLeave();
+  const clearLeave = useClearLeave();
+  const [leaveForm, setLeaveForm] = useState({ from: "", to: "", note: "" });
+
   const rows = data?.items ?? [];
   const unresolved = rows.filter((r) => r.status === "incomplete");
 
+  async function submitLeave() {
+    if (!userId) return toast.error("Pick an employee first");
+    if (!leaveForm.from) return toast.error("Pick the first day of leave");
+    try {
+      const res = await markLeave.mutateAsync({
+        userId,
+        from: leaveForm.from,
+        to: leaveForm.to || undefined,
+        note: leaveForm.note || undefined,
+      });
+      toast.success(res.message);
+      setLeaveForm({ from: "", to: "", note: "" });
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
+
+  async function removeLeave(row: AttendanceDay) {
+    if (!row.userId) return;
+    try {
+      await clearLeave.mutateAsync({ userId: row.userId, date: row.date });
+      toast.success("Leave removed");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+  }
+
   async function submitResolve() {
-    if (!resolving || !outAt) return;
+    // A synthetic day has no id and no open punch, so it can never be the one
+    // being settled — the guard keeps that guarantee local.
+    if (!resolving?.id || !outAt) return;
     try {
       await resolve.mutateAsync({ id: resolving.id, outAt: new Date(outAt).toISOString(), note });
       toast.success("Day settled");
@@ -159,6 +199,75 @@ export function AttendanceAdminPage() {
               className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
             />
           </div>
+        </div>
+      </div>
+
+      {/* Approved leave. Worth a full day's pay, so it is a pay decision and
+          sits with the admin. */}
+      <div className="pg-tile">
+        <h2 className="text-sm font-semibold text-foreground">Approved leave</h2>
+        <p className="mb-3 text-xs text-muted-foreground">
+          {userId
+            ? "Leave is paid at the full day rate. A day the employee actually worked is left as it is."
+            : "Pick an employee above to record their leave."}
+        </p>
+
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="min-w-0 flex-1 md:flex-none">
+            <label
+              htmlFor="leave-from"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              First day
+            </label>
+            <input
+              id="leave-from"
+              data-testid="leave-from"
+              type="date"
+              value={leaveForm.from}
+              onChange={(e) => setLeaveForm((f) => ({ ...f, from: e.target.value }))}
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
+            />
+          </div>
+          <div className="min-w-0 flex-1 md:flex-none">
+            <label
+              htmlFor="leave-to"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Last day <span className="font-normal opacity-70">(optional)</span>
+            </label>
+            <input
+              id="leave-to"
+              data-testid="leave-to"
+              type="date"
+              value={leaveForm.to}
+              onChange={(e) => setLeaveForm((f) => ({ ...f, to: e.target.value }))}
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 font-mono text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:w-auto md:py-1.5"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="leave-note"
+              className="mb-1 block text-xs font-medium text-muted-foreground"
+            >
+              Reason <span className="font-normal opacity-70">(kept on the record)</span>
+            </label>
+            <input
+              id="leave-note"
+              value={leaveForm.note}
+              onChange={(e) => setLeaveForm((f) => ({ ...f, note: e.target.value }))}
+              placeholder="Sanctioned leave"
+              className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring md:h-auto md:py-1.5"
+            />
+          </div>
+          <button
+            data-testid="leave-save"
+            onClick={submitLeave}
+            disabled={markLeave.isPending || !userId || !leaveForm.from}
+            className="pg-tap flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 md:min-h-0 md:w-auto md:py-1.5"
+          >
+            <CalendarOff className="h-3.5 w-3.5" /> Mark leave
+          </button>
         </div>
       </div>
 
@@ -258,7 +367,7 @@ export function AttendanceAdminPage() {
           ) : (
             rows.map((r) => (
               <RecordCard
-                key={r.id}
+                key={r.id ?? r.date}
                 title={r.userName}
                 amount={
                   <span className={r.status === "incomplete" ? "text-destructive" : undefined}>
@@ -305,6 +414,16 @@ export function AttendanceAdminPage() {
                     >
                       Settle this day
                     </button>
+                  ) : r.status === "leave" ? (
+                    <button
+                      type="button"
+                      data-testid={`clear-leave-${r.id}`}
+                      onClick={() => removeLeave(r)}
+                      disabled={clearLeave.isPending}
+                      className="pg-tap flex flex-1 items-center justify-center rounded-lg border border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                    >
+                      Remove leave
+                    </button>
                   ) : undefined
                 }
               />
@@ -337,7 +456,7 @@ export function AttendanceAdminPage() {
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={r.id} className="transition-colors hover:bg-accent/40">
+                <tr key={r.id ?? r.date} className="transition-colors hover:bg-accent/40">
                   <td className="whitespace-nowrap px-4 py-2 font-mono tabular-nums">
                     {new Date(r.date).toLocaleDateString("en-IN", {
                       day: "2-digit",
@@ -385,6 +504,16 @@ export function AttendanceAdminPage() {
                         Settle
                       </button>
                     )}
+                    {r.status === "leave" && (
+                      <button
+                        data-testid={`clear-leave-${r.id}`}
+                        onClick={() => removeLeave(r)}
+                        disabled={clearLeave.isPending}
+                        className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-destructive disabled:opacity-50"
+                      >
+                        Remove leave
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))
@@ -413,7 +542,7 @@ export function AttendanceAdminPage() {
               htmlFor="resolve-out"
               className="mb-1 mt-4 block text-xs font-medium text-muted-foreground"
             >
-              Logged out at
+              Punched out at
             </label>
             <input
               id="resolve-out"
@@ -433,7 +562,7 @@ export function AttendanceAdminPage() {
               id="resolve-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Forgot to log out at site"
+              placeholder="Forgot to punch out at site"
               className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <div className="mt-5 flex justify-end gap-3">

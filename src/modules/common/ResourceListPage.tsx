@@ -21,26 +21,22 @@ import { Fab } from "@/shared/components/Fab";
 import { RecordCard } from "@/shared/components/RecordCard";
 
 /**
- * Anything inside a row that already does something on click. A row-level
- * handler must defer to these, or clicking "Delete" would also open the record
- * behind the confirm dialog, and the mailto: link in the lead table would fire
- * a navigation at the same time as the mail client.
+ * Anything inside a row that already acts on click. A row-level handler must
+ * defer to these, or "Delete" also opens the record behind the confirm dialog.
  *
  * `[data-row-ignore]` is the escape hatch for a cell that is interactive
- * without being one of these elements (an inline status dropdown, say).
+ * without being one of these elements.
  */
 const INTERACTIVE_SELECTOR =
   "a, button, input, select, textarea, label, summary, [role='button'], [role='menuitem'], [role='checkbox'], [contenteditable='true'], [data-row-ignore]";
 
 /**
- * True when the user is part-way through selecting text.
+ * True when the user is part-way through selecting text — the guard that makes
+ * row-click safe here. Staff drag across a cell to copy a mobile number, and a
+ * click fires on mouseup at the end of that drag.
  *
- * This is the guard that makes row-click safe in a CRM specifically. Staff drag
- * across a cell to copy a mobile number or a GST figure out of the table, and
- * a click fires on mouseup at the end of that drag — so without this check,
- * every attempt to copy a phone number navigates away instead. The selection
- * has to be a non-empty Range that actually intersects this row: a stale
- * caret-collapsed selection elsewhere on the page must not block a real click.
+ * The selection must be a non-empty Range intersecting *this* row, so a stale
+ * collapsed selection elsewhere does not block a real click.
  */
 function isSelectingText(row: HTMLElement): boolean {
   const sel = window.getSelection();
@@ -71,14 +67,9 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   hideActionsColumn?: boolean;
   hideCreateButton?: boolean;
   /**
-   * Secondary actions for the header, beside Refresh — Import Leads, Build from
-   * catalog, and the like.
-   *
-   * These used to be rendered by the page itself in a `justify-end` row *above*
-   * `<ResourceListPage>`, which on a phone produced the Leads screen opening
-   * with a lone "Import Leads" button sitting above its own page title. Given a
-   * slot, they join the header row and collapse to icons at 390px like
-   * everything else in it.
+   * Secondary actions for the header row, beside Refresh — Import Leads, Build
+   * from catalog. Put them here rather than above the list, so they collapse to
+   * icons at 390px with the rest of the header.
    */
   headerActions?: React.ReactNode;
   columns: Column<TItem>[];
@@ -94,18 +85,13 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   useDelete?: () => { mutateAsync: (id: string) => Promise<unknown>; isPending?: boolean };
   buildQuery: (args: { search: string; page: number; limit: number }) => TQuery;
   /**
-   * The screen's filter controls.
+   * The screen's filter controls. `layout` says where they are being drawn:
+   * inline above the table on desktop, in a sheet behind a Filters button on a
+   * phone (inline they fill the entire first screen).
    *
-   * `layout` says where they are being drawn. On desktop they sit inline above
-   * the table (`"inline"`); on a phone they are moved into a sheet
-   * (`"sheet"`) behind a Filters button, because rendered inline they filled the
-   * entire first screen — /leads opened with seven stacked controls and roughly
-   * 1200px of form before the first lead appeared.
-   *
-   * A page must omit its own search field when `layout === "sheet"`: the list
-   * puts search in the sticky toolbar itself, since it is the one filter used
-   * often enough to deserve permanent space, and rendering it twice is the
-   * obvious failure mode of moving the rest away.
+   * **A page must omit its own search field when `layout === "sheet"`** — the
+   * list puts search in the sticky toolbar, and rendering it twice is the
+   * obvious failure mode here.
    */
   renderFilters?: (args: {
     search: string;
@@ -113,10 +99,9 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
     layout: "inline" | "sheet";
   }) => React.ReactNode;
   /**
-   * Number of filters currently narrowing the list, excluding search. Shown on
-   * the mobile Filters button, because once the controls are behind a sheet
-   * there is otherwise nothing to say the list is filtered — and a list that is
-   * silently filtered reads as a list with missing records.
+   * Filters currently narrowing the list, excluding search. Shown on the mobile
+   * Filters button: once the controls are behind a sheet, a silently filtered
+   * list reads as a list with missing records.
    */
   activeFilterCount?: number;
   hideDefaultSearch?: boolean;
@@ -138,14 +123,12 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
    * Selection is page-local and clears whenever the query changes.
    */
   isRowSelectable?: (item: TItem) => boolean;
-  /** Bar rendered above the table while at least one row is selected. */
   /**
    * Bar rendered above the table while at least one row is selected.
    *
-   * Receives the selected `items`, not just their ids, because a bar can carry
-   * actions with different eligibility rules — on leads, anything may be
-   * reassigned but only dead leads may be deleted. Without the items each
-   * action would have to re-derive state it cannot see.
+   * Receives the selected `items`, not just ids, because actions can have
+   * different eligibility rules — on leads anything may be reassigned, but only
+   * dead leads may be deleted.
    */
   renderBulkActions?: (args: {
     ids: string[];
@@ -153,17 +136,13 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
     clear: () => void;
   }) => React.ReactNode;
   /**
-   * Makes the whole row open the record, the way every mature CRM behaves.
+   * Return a detail route and clicking anywhere in the row navigates there —
+   * honouring ctrl/cmd/shift/middle-click, and standing down on interactive
+   * elements or while text is being selected.
    *
-   * Return the detail route for a row and clicking anywhere in it navigates
-   * there — respecting ctrl/cmd/shift/middle-click as "open in a new tab", and
-   * standing down whenever the click landed on something interactive or the
-   * user was selecting text.
-   *
-   * This is strictly an *enhancement*: the anchor in the identifying cell must
-   * stay, because that is what keyboard and screen-reader users navigate with
-   * and what gives the browser a real URL to preview and copy. A `<tr>` cannot
-   * do either of those jobs, which is why this is not implemented as one big
+   * Strictly an *enhancement*: the anchor in the identifying cell must stay.
+   * That is what keyboard and screen-reader users navigate with, and what gives
+   * the browser a URL to preview and copy — which is why this is not one big
    * clickable row with `role="link"`.
    */
   rowHref?: (item: TItem) => string;
@@ -175,16 +154,10 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   /**
    * How one record looks below `md`, where the table is replaced by cards.
    *
-   * A table earns its keep by aligning a column so the eye can run down it. That
-   * needs width; at 390px there is none, and every list here was 800–1500px
-   * wide, so the table degraded into sideways panning — three columns visible,
-   * the rest off-screen, and the customer name wrapped over three lines. Cards
-   * drop the alignment deliberately and keep each record whole.
-   *
-   * Optional. Without it the list derives a serviceable card from the first few
-   * columns, which is right for a secondary screen and wrong for a primary one:
-   * a column order tuned for scanning a wide grid is not the order someone reads
-   * on a phone, and only the page knows which two facts actually matter.
+   * Optional — without it the list derives a card from the first few columns.
+   * That is fine for a secondary screen and wrong for a primary one: a column
+   * order tuned for scanning a wide grid is not the order someone reads on a
+   * phone, and only the page knows which two facts actually matter.
    */
   renderMobileCard?: (
     item: TItem,
@@ -800,7 +773,9 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           </span>{" "}
           of <span className="font-mono tabular-nums text-foreground">{total}</span>
         </span>
-        <div className="hidden items-center gap-2 md:flex">
+        {/* Wrapping label: this shell backs every resource screen, so an
+            unlabelled select here is unlabelled on a dozen pages. */}
+        <label className="hidden items-center gap-2 md:flex">
           <span className="text-muted-foreground">Rows:</span>
           <select
             value={pageSize}
@@ -816,7 +791,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
               </option>
             ))}
           </select>
-        </div>
+        </label>
 
         {/* Desktop: full pager. */}
         <div className="hidden items-center gap-1 md:flex">

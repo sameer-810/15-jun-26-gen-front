@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { Building2, Save, ImagePlus, X } from "lucide-react";
 import { MediaPickerDialog } from "@/modules/media/components/MediaPickerDialog";
@@ -39,12 +40,18 @@ type FormValues = {
   chatShowTimestamps: boolean;
 };
 
+/**
+ * A labelled form field. The `<label>` **wraps** its control rather than sitting
+ * beside it: these inputs carry no `id`, so a sibling label with no `htmlFor`
+ * associates with nothing and a screen reader reads "edit text, blank".
+ * Wrapping gives the association without threading ids through every call site.
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
+    <label className="block">
+      <span className="mb-1 block text-xs font-medium text-muted-foreground">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -87,16 +94,17 @@ function SeriesRow({
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="grid gap-3 sm:grid-cols-[1fr_7rem_9rem] sm:items-end">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+        {/* Wrapping labels — see Field above. */}
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
             {title} prefix
-          </label>
+          </span>
           {prefixInput}
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">Next no.</label>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Next no.</span>
           {numberInput}
-        </div>
+        </label>
         <div className="min-w-0">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Next will be</span>
           <span className="block truncate font-mono text-sm font-medium tabular-nums text-foreground">
@@ -426,9 +434,11 @@ export function SettingsPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Pre-written replies your team can insert into a conversation are managed on the{" "}
-            <a href="/templates" className="text-primary hover:underline">
+            {/* Link, not <a href> — a bare anchor reloads the SPA and discards
+                unsaved edits on this form. */}
+            <Link to="/templates" className="rounded text-primary hover:underline">
               Templates
-            </a>{" "}
+            </Link>{" "}
             screen.
           </p>
         </section>
@@ -475,13 +485,14 @@ export function SettingsPage() {
                       alt={label}
                       className="h-24 w-full rounded-lg border border-border bg-white object-contain p-1"
                     />
+                    {/* Thumb-sized target on a phone; the icon stays small. */}
                     <button
                       type="button"
                       onClick={() => setArt((a) => ({ ...a, [key]: "" }))}
                       aria-label={`Remove ${label}`}
-                      className="absolute right-0 top-0 rounded-bl bg-black/60 p-0.5 text-white hover:bg-black/80"
+                      className="absolute right-0 top-0 flex h-10 w-10 items-center justify-center rounded-bl bg-black/60 text-white transition-colors hover:bg-black/80 md:h-7 md:w-7"
                     >
-                      <X className="h-3 w-3" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ) : (

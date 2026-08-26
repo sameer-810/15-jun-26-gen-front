@@ -75,3 +75,11 @@ export function formatDateTime(dateStr: string | Date | undefined | null): strin
     minute: "2-digit",
   });
 }
+
+/**
+ * Round to paise, matching the server's `round2`. Any figure previewed before
+ * saving must use the same rounding, or the screen and the record disagree.
+ */
+export function round2(n: number): number {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}

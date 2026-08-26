@@ -110,6 +110,119 @@ test.describe("R3 / R4 — pay and incentive arithmetic", () => {
     expect(body.pay.grossEarned).toBeLessThanOrEqual(31000);
   });
 
+  /**
+   * The requirement, not the formula.
+   *
+   * The test above asserts `grossEarned === dayRate × payableDays` — the
+   * implementation restated, so it cannot fail for the thing it is named after.
+   * This one checks the promise payroll.rules.js actually makes: a month with
+   * nothing wrong in it pays the whole monthly gross.
+   *
+   * The setup is the point. Every *working* day gets a stored row and the
+   * Sundays get none — the shape real attendance has. If the Sundays are not
+   * pulled in from the calendar, this cannot reach 30,000.
+   */
+  test("a complete month pays exactly the monthly gross", async () => {
+    const me = await (await ctx.get(`${API}/auth/me`)).json();
+    const userId = me.data.id;
+    await ctx.patch(`${API}/auth/users/${userId}`, { data: { monthlyGross: 30000 } });
+
+    // April 2026: 30 days, well before any live attendance in this database.
+    const MONTH = "2026-04";
+    const dayOf = (d: number) => `${MONTH}-${String(d).padStart(2, "0")}`;
+    // Sunday in IST. Reading the UTC weekday of a bare YYYY-MM-DD is safe here
+    // because midnight UTC and midnight IST fall on the same calendar date.
+    const sundays: number[] = [];
+    for (let d = 1; d <= 30; d++) {
+      if (new Date(`${dayOf(d)}T00:00:00Z`).getUTCDay() === 0) sundays.push(d);
+    }
+    expect(sundays.length).toBeGreaterThan(0);
+
+    const marked = await ctx.post(`${API}/attendance/leave`, {
+      data: { userId, from: dayOf(1), to: dayOf(30), note: `${RUN_TAG} payroll check` },
+    });
+    expect(marked.ok(), `could not mark leave: ${await marked.text()}`).toBeTruthy();
+    // Take the Sundays back out, so they have no stored row and must be
+    // supplied by the calendar.
+    for (const d of sundays) {
+      await ctx.delete(`${API}/attendance/leave`, { data: { userId, date: dayOf(d) } });
+    }
+
+    try {
+      const body = (await (await ctx.get(`${API}/attendance/monthly?month=${MONTH}`)).json()).data;
+
+      // Every calendar day is present, not just the ones with a row behind them.
+      expect(body.days.length).toBe(30);
+      expect(body.period.daysInMonth).toBe(30);
+
+      // The Sundays came from the calendar, not the database.
+      expect(body.pay.counts.week_off).toBe(sundays.length);
+      expect(body.pay.counts.leave).toBe(30 - sundays.length);
+
+      // Nothing is unaccounted for: leave + week_off must cover the whole month.
+      const counted = Object.values(body.pay.counts as Record<string, number>).reduce(
+        (a, b) => a + b,
+        0,
+      );
+      expect(counted).toBe(30);
+      expect(body.pay.counts.absent ?? 0).toBe(0);
+
+      // The point of the test.
+      expect(body.pay.payableDays).toBe(30);
+      expect(body.pay.grossEarned).toBe(30000);
+    } finally {
+      for (let d = 1; d <= 30; d++) {
+        await ctx
+          .delete(`${API}/attendance/leave`, { data: { userId, date: dayOf(d) } })
+          .catch(() => undefined);
+      }
+    }
+  });
+
+  test("an unpunched weekly off is still a paid day", async () => {
+    const me = await (await ctx.get(`${API}/auth/me`)).json();
+    await ctx.patch(`${API}/auth/users/${me.data.id}`, { data: { monthlyGross: 30000 } });
+
+    // Nothing is written for this month at all — every day comes from the
+    // calendar. The Sundays must still be counted and paid.
+    const body = (await (await ctx.get(`${API}/attendance/monthly?month=2026-04`)).json()).data;
+    const weekOffs = body.days.filter((d: { status: string }) => d.status === "week_off");
+
+    expect(weekOffs.length).toBeGreaterThan(0);
+    expect(body.pay.counts.week_off).toBe(weekOffs.length);
+    // Those days are worth full pay, so they must show up in payableDays.
+    expect(body.pay.payableDays).toBeGreaterThanOrEqual(weekOffs.length);
+    expect(body.pay.grossEarned).toBe(Math.round(body.pay.dayRate * body.pay.payableDays));
+  });
+
+  test("approved leave is recorded, paid, and refuses a worked day", async () => {
+    const me = await (await ctx.get(`${API}/auth/me`)).json();
+    const userId = me.data.id;
+    const DAY = "2026-04-15";
+
+    const res = await ctx.post(`${API}/attendance/leave`, {
+      data: { userId, from: DAY, note: `${RUN_TAG} single day` },
+    });
+    expect(res.ok()).toBeTruthy();
+    expect((await res.json()).data.marked).toBe(1);
+
+    try {
+      const body = (await (await ctx.get(`${API}/attendance/monthly?month=2026-04`)).json()).data;
+      expect(body.pay.counts.leave).toBe(1);
+
+      // A range that would cover a day already settled must not silently
+      // overwrite it — the guard reports it rather than clobbering the record.
+      const bad = await ctx.post(`${API}/attendance/leave`, {
+        data: { userId, from: "2026-04-11", to: "2026-04-09" },
+      });
+      expect(bad.status()).toBe(400);
+    } finally {
+      await ctx
+        .delete(`${API}/attendance/leave`, { data: { userId, date: DAY } })
+        .catch(() => undefined);
+    }
+  });
+
   test("an incomplete day pays nothing and is reported as unresolved", async () => {
     // The punch made above opened a shift and never closed it.
     const res = await ctx.get(`${API}/attendance/monthly`);

@@ -3,24 +3,20 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * A bottom sheet.
+ * A bottom sheet — the mobile counterpart to a centred dialog. Full-bleed and
+ * anchored to the edge the thumb is already near, rather than a narrow modal
+ * with its Save button in the vertical middle.
  *
- * The mobile counterpart to a centred dialog, and the reason the app needs one
- * is arithmetic: a `max-w-lg` modal with `p-4` around it leaves ~350px of usable
- * width on a 390px screen, and it puts its Save button in the vertical middle —
- * the part of the screen a thumb reaches last. A sheet is full-bleed, anchored
- * to the edge the thumb is already near, and dismissible with a flick.
+ * Three behaviours are load-bearing, not decoration:
  *
- * Three behaviours here are not decoration:
- *
- *  1. **Drag to dismiss**, tracked on pointer events so it works with a mouse in
- *     devtools too. It only engages from the header/grip — dragging from the
- *     body would fight a scrolling form, which is the classic sheet bug where
- *     scrolling up past the top yanks the sheet closed mid-edit.
- *  2. **Escape closes and focus is restored** to whatever opened it.
- *  3. **The page behind does not scroll.** Without this, flicking inside a sheet
- *     that has reached its end scrolls the list underneath, and closing it
- *     leaves the user somewhere else entirely.
+ *  1. **Drag to dismiss engages from the header/grip only.** Dragging from the
+ *     body fights a scrolling form — that is the classic sheet bug where
+ *     scrolling up past the top yanks the sheet closed mid-edit. Tracked on
+ *     pointer events so it also works with a mouse in devtools.
+ *  2. **Escape closes and focus returns** to whatever opened it.
+ *  3. **The page behind is scroll-locked.** Without it, flicking past the end
+ *     of the sheet scrolls the list underneath and closing leaves the user
+ *     somewhere else entirely.
  */
 export function Sheet({
   open,

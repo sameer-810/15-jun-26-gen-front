@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   present: "Present",
   half_day: "Half day",
   absent: "Absent",
-  incomplete: "Not logged out",
+  incomplete: "Not punched out",
   leave: "Leave",
   week_off: "Week off",
 };
@@ -157,8 +157,8 @@ export function MyPerformancePage() {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <p className="text-sm text-foreground">
             <span className="font-mono font-medium tabular-nums">{data.pay.unresolvedDays}</span>{" "}
-            day{data.pay.unresolvedDays === 1 ? "" : "s"} with no logout. These pay nothing until an
-            admin settles them — they are not counted as absent either.
+            day{data.pay.unresolvedDays === 1 ? "" : "s"} with no punch-out. These pay nothing until
+            an admin settles them — they are not counted as absent either.
           </p>
         </div>
       )}
@@ -171,27 +171,58 @@ export function MyPerformancePage() {
           value={data.pay.payableDays}
           hint={`of ${data.pay.daysInMonth} in the month`}
         />
-        <StatCard
-          label="Gross Earned"
-          value={formatCurrency(data.pay.grossEarned)}
-          hint={`day rate ${formatCurrency(data.pay.dayRate)}`}
-        />
-        <StatCard
-          label="Incentive"
-          value={formatCurrency(data.incentive.incentiveEarned)}
-          hint={`${data.incentive.incentiveRate}% of ${formatCurrency(data.incentive.salesValue)}`}
-        />
-        <StatCard
-          label="Total"
-          value={formatCurrency(data.totalEarned)}
-          hint="before statutory deductions"
-        />
+        {data.payVisible ? (
+          <>
+            <StatCard
+              label="Gross Earned"
+              value={formatCurrency(data.pay.grossEarned ?? 0)}
+              hint={`day rate ${formatCurrency(data.pay.dayRate ?? 0)}`}
+            />
+            <StatCard
+              label="Incentive"
+              value={formatCurrency(data.incentive.incentiveEarned ?? 0)}
+              hint={`${data.incentive.incentiveRate ?? 0}% of ${formatCurrency(
+                data.incentive.salesValue ?? 0,
+              )}`}
+            />
+            <StatCard
+              label="Total"
+              value={formatCurrency(data.totalEarned ?? 0)}
+              hint="before statutory deductions"
+            />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Units Sold"
+              value={data.incentive.unitsSold}
+              hint="closed this month"
+            />
+            <StatCard
+              label="Unresolved"
+              value={data.pay.unresolvedDays}
+              hint="days with no punch-out"
+            />
+            <StatCard
+              label="Overtime"
+              value={hhmm(data.pay.overtimeMinutes)}
+              hint="beyond a full day"
+            />
+          </>
+        )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        These are <strong className="font-medium text-foreground">gross</strong> figures. PF, ESI
-        and TDS are not calculated here — they are handled in payroll by your accountant.
-      </p>
+      {data.payVisible ? (
+        <p className="text-xs text-muted-foreground">
+          These are <strong className="font-medium text-foreground">gross</strong> figures. PF, ESI
+          and TDS are not calculated here — they are handled in payroll by your accountant.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Attendance and targets only. Salary and incentive figures are visible to the employee
+          themselves and to an administrator.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="pg-tile lg:col-span-5">
@@ -213,7 +244,10 @@ export function MyPerformancePage() {
         <div className="pg-panel lg:col-span-7">
           <div className="border-b border-border px-4 py-2.5">
             <h2 className="text-sm font-semibold text-foreground">Attendance</h2>
-            <p className="text-xs text-muted-foreground">Every day you logged in and out</p>
+            <p className="text-xs text-muted-foreground">
+              Every day of the month, including the ones you did not log in on — those are what the
+              pay above is counted from
+            </p>
           </div>
           <div className="max-h-[26rem] overflow-auto">
             <table className="w-full text-sm">
@@ -239,7 +273,8 @@ export function MyPerformancePage() {
                   </tr>
                 ) : (
                   data.days.map((d) => (
-                    <tr key={d.id} className="transition-colors hover:bg-accent/40">
+                    // A day with no punch has no row and so no id; the date is unique either way.
+                    <tr key={d.id ?? d.date} className="transition-colors hover:bg-accent/40">
                       <td className="whitespace-nowrap px-4 py-2 font-mono tabular-nums">
                         {new Date(d.date).toLocaleDateString("en-IN", {
                           day: "2-digit",

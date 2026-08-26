@@ -13,25 +13,14 @@ import { getApiErrorMessage } from "@/shared/api/http";
 /**
  * Sign in.
  *
- * Rebuilt because this was the one screen that genuinely read as a template:
- * a dark marketing panel beside a rounded-2xl card floating on grey, three
- * icon-in-a-square feature bullets, a stock Unsplash industrial photograph, and
- * a headline ("The modern way to run a generator sales & service business")
- * that would suit any product in any industry.
+ * Two constraints, both from DESIGN.md ("Login page"):
  *
- * Two things drive the replacement.
- *
- * First: nobody is being *sold* here. Everyone who reaches this screen already
- * works at SRF and is trying to get to a lead or a quotation. Feature bullets
- * are for a landing page. So the marketing panel is gone and what remains is
- * the mark, the type and the cobalt — the identity doing its own work instead
- * of a stock photograph doing it.
- *
- * Second: the submit button is no longer disabled while the user types. That is
- * a documented anti-pattern — a disabled control cannot tell you which rule you
- * failed, so the user is left guessing. It now stays enabled from the first
- * keystroke, validates on submit, and shows the reason. Disabled only while a
- * request is genuinely in flight.
+ * - **No marketing.** Everyone reaching this screen already works here and is
+ *   trying to get to a lead. No feature bullets, no stock photography — the
+ *   mark, the type and the cobalt carry the identity.
+ * - **The submit button is never disabled by validation**, only while a request
+ *   is in flight. A disabled control cannot say which rule you failed; this
+ *   validates on submit and shows the reason.
  */
 
 const schema = z.object({

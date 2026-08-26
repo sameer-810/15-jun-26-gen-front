@@ -5,6 +5,8 @@ import {
   listAttendance,
   resolveDay,
   getMonthly,
+  markLeave,
+  clearLeave,
   listTargets,
   setTarget,
   deleteTarget,
@@ -46,6 +48,30 @@ export function useResolveDay() {
   return useMutation({
     mutationFn: ({ id, ...rest }: { id: string; outAt: string; note?: string }) =>
       resolveDay(id, rest),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["attendance"] });
+      qc.invalidateQueries({ queryKey: ["performance"] });
+    },
+  });
+}
+
+/** Grant paid leave over a date range. Admin only, enforced server-side. */
+export function useMarkLeave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: markLeave,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["attendance"] });
+      // Leave is a paid day, so the month's earnings change with it.
+      qc.invalidateQueries({ queryKey: ["performance"] });
+    },
+  });
+}
+
+export function useClearLeave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: clearLeave,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["attendance"] });
       qc.invalidateQueries({ queryKey: ["performance"] });

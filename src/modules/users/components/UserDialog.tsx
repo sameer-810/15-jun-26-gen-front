@@ -10,6 +10,9 @@ import type { AuthUser } from "@/modules/auth/authSlice";
 
 const ROLES: AuthUser["role"][] = ["admin", "manager", "sales", "inventory"];
 
+/** Mirrors passwordSchema in the backend's auth.validation.js. */
+const MIN_PASSWORD = 12;
+
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required"),
   email: z.string().trim().email("Invalid email"),
@@ -142,8 +145,12 @@ export function UserDialog({ open, onOpenChange, mode, value, onSuccess }: Props
   async function onSubmit(data: FormValues) {
     try {
       if (mode === "create") {
-        if (!data.password || data.password.length < 6) {
-          form.setError("password", { message: "Password (min 6 chars) is required" });
+        // Mirrors passwordSchema in the backend; checked here so the message
+        // lands on the field rather than in a toast after a round trip.
+        if (!data.password || data.password.length < MIN_PASSWORD) {
+          form.setError("password", {
+            message: `Password must be at least ${MIN_PASSWORD} characters`,
+          });
           return;
         }
         await createMutation.mutateAsync({
@@ -217,7 +224,9 @@ export function UserDialog({ open, onOpenChange, mode, value, onSuccess }: Props
           <input
             type="password"
             className={inputCls}
-            placeholder={mode === "edit" ? "Leave blank to keep" : ""}
+            placeholder={
+              mode === "edit" ? "Leave blank to keep" : `At least ${MIN_PASSWORD} characters`
+            }
             {...form.register("password")}
           />
           {errors.password && (

@@ -18,19 +18,12 @@ const ROLE_LABELS: Record<string, string> = {
 /**
  * Bottom tab bar — the phone's primary navigation, below `md` only.
  *
- * It replaces reaching for a hamburger in the top-left corner, which on a 6"
- * screen is the furthest point from a right thumb and the reason navigating
- * this CRM one-handed meant regripping the phone for every screen change.
+ * **Four tabs and a "More" sheet — never five.** A fifth label starts
+ * truncating at 390px, and "Quotati…" and "Quantit…" are the same word at a
+ * glance. Everything else is one tap away inside More, grouped as the sidebar
+ * groups it so the two navigations teach each other.
  *
- * Four tabs and a "More" sheet. Four because a fifth label starts truncating at
- * 390px, and a truncated tab label is worse than no fifth tab: "Quotati…" and
- * "Quantit…" are the same word at a glance. Everything the role can reach is
- * still one tap away inside More, grouped exactly as the sidebar groups it, so
- * the two navigations teach each other rather than competing.
- *
- * The desktop sidebar is untouched. DESIGN.md protects it as the frame that
- * makes the tool learnable, and this is a second frame for a second device, not
- * a replacement for that one.
+ * The desktop sidebar is untouched; DESIGN.md protects it.
  */
 export function MobileTabBar() {
   const location = useLocation();

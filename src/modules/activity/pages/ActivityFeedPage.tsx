@@ -161,8 +161,8 @@ export function ActivityFeedPage() {
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Type</label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Type</span>
           <select
             className={selectCls}
             value={type}
@@ -178,9 +178,9 @@ export function ActivityFeedPage() {
               </option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">Entity</label>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">Entity</span>
           <select
             className={selectCls}
             value={entityType}
@@ -196,7 +196,7 @@ export function ActivityFeedPage() {
               </option>
             ))}
           </select>
-        </div>
+        </label>
       </FilterShell>
 
       {/* Timeline */}

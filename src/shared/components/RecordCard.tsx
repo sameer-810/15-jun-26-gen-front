@@ -3,17 +3,9 @@ import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * One record, as a card. The mobile counterpart to a table row.
+ * One record, as a card — the mobile counterpart to a table row, used below `md`.
  *
- * A table is a comparison instrument: it works because the eye runs down an
- * aligned column. That mechanism needs width, and at 390px there is none — the
- * table degrades into sideways panning, which keeps the *cost* of the alignment
- * (you can only see three columns) and loses the *benefit* (you can't compare
- * anything you can't see at once). A card gives the alignment up on purpose and
- * keeps the record whole instead: everything about one lead in one block.
- *
- * Layout, top-left to bottom-right, in the order someone reads to decide whether
- * to act:
+ * Slots read top-left to bottom-right, in the order someone decides whether to act:
  *
  *     ┌──────────────────────────────────────┐
  *     │ (RK)  Rajesh Kumar          ₹4,50,000│   disc · title · amount
@@ -22,10 +14,9 @@ import { cn } from "@/lib/utils";
  *     │       [ Call ]  [ WhatsApp ]      ⋯  │   actions
  *     └──────────────────────────────────────┘
  *
- * The title stays a real `<a>` even though the whole card is tappable, for the
- * same reason the table's identifying cell does (DESIGN.md, row activation):
- * keyboard users, screen readers and "copy link address" all need an anchor,
- * and a tappable `<div>` gives them nothing.
+ * The title must stay a real `<a>` even though the whole card is tappable —
+ * keyboard users, screen readers and "copy link address" all need an anchor.
+ * See DESIGN.md, row activation.
  */
 export function RecordCard({
   to,

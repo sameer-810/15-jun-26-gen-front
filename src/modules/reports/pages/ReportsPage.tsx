@@ -115,24 +115,26 @@ export function ReportsPage() {
       <div className="pg-tile flex flex-wrap items-end gap-3">
         {showDates && (
           <>
-            <div className="min-w-0 flex-1 md:flex-none">
-              <label className="block text-xs font-medium text-muted-foreground mb-1">From</label>
+            {/* Wrapping labels — the captions were siblings with no htmlFor,
+                so nothing tied "From" and "To" to their date inputs. */}
+            <label className="block min-w-0 flex-1 md:flex-none">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">From</span>
               <input
                 type="date"
                 className={`${inputCls} w-full md:w-auto`}
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
-            </div>
-            <div className="min-w-0 flex-1 md:flex-none">
-              <label className="block text-xs font-medium text-muted-foreground mb-1">To</label>
+            </label>
+            <label className="block min-w-0 flex-1 md:flex-none">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">To</span>
               <input
                 type="date"
                 className={`${inputCls} w-full md:w-auto`}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />
-            </div>
+            </label>
           </>
         )}
         <button

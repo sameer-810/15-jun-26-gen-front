@@ -3,24 +3,16 @@ import { cn } from "@/lib/utils";
 /**
  * A single headline figure.
  *
- * Rebuilt away from the pastel-icon-in-a-rounded-square KPI card, which is the
- * most reproduced component in generated admin UI. Three things changed and
- * each one is a judgement, not a taste:
+ * Three rules hold this component to the palette discipline in DESIGN.md, and
+ * breaking any of them re-introduces the generic admin-template KPI card:
  *
- * 1. **The icon tile is gone.** A wallet glyph next to "Open Pipeline" tells a
- *    salesperson nothing they didn't get from the label — it existed to fill
- *    the corner. Worse, it spent a *colour* (emerald, amber, sky) on decoration
- *    in a product where colour is supposed to mean status. Someone glancing at
- *    an amber tile should think "something needs attention", not "this is the
- *    follow-ups box".
- *
- * 2. **The figure is mono.** These four values sit in a row and get compared to
- *    each other and to yesterday's. Proportional digits make that harder for no
- *    reason. Same reasoning as every currency cell in the tables.
- *
- * 3. **`tone` now drives the value's colour, and only when it earns it.** It is
- *    an *exception* channel: a stat is plain by default and coloured only when
- *    the number itself is the alarm — overdue follow-ups, stock below minimum.
+ * 1. **No icon tile.** Colour in this product means status, so it is never
+ *    spent on a decorative glyph beside the label.
+ * 2. **The figure is mono + tabular.** These sit in a row and get compared to
+ *    each other; proportional digits make that harder.
+ * 3. **`tone` is an exception channel.** A stat is plain by default and takes
+ *    colour only when the number itself is the alarm — overdue follow-ups,
+ *    stock below minimum.
  */
 interface StatCardProps {
   label: string;

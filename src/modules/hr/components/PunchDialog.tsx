@@ -116,7 +116,7 @@ export function PunchDialog({
     if (!shot) return;
     try {
       await punchMutation.mutateAsync({ photoBase64: shot, ...(coords ?? {}) });
-      toast.success(direction === "in" ? "Logged in" : "Logged out");
+      toast.success(direction === "in" ? "Punched in" : "Punched out");
       onClose();
     } catch (err) {
       // The frame is kept on purpose so they can send it again.
@@ -132,7 +132,7 @@ export function PunchDialog({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-foreground">
-              {direction === "in" ? "Log in for the day" : "Log out for the day"}
+              {direction === "in" ? "Punch in for the day" : "Punch out for the day"}
             </h3>
             <p className="mt-0.5 text-sm text-muted-foreground">
               Take a photo to record your attendance.
@@ -200,8 +200,8 @@ export function PunchDialog({
                 {punchMutation.isPending
                   ? "Recording…"
                   : direction === "in"
-                    ? "Confirm log in"
-                    : "Confirm log out"}
+                    ? "Confirm punch in"
+                    : "Confirm punch out"}
               </button>
             </>
           ) : (

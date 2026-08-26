@@ -38,10 +38,10 @@ import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { QuotationPrefill } from "@/modules/quotation/types";
 
 /**
- * The lead detail screen from Change Request point 13 — "when you click on a
+ * The lead detail screen — "when you click on a
  * lead it should open this way". Header with labels and contact chips, then
  * engagement counters, contact details, products of interest, the documents
- * and sales this lead produced, and its full history (point 14).
+ * and sales this lead produced, and its full history.
  */
 
 const TABS = ["Overview", "History", "Documents"] as const;
@@ -90,7 +90,7 @@ export function LeadDetailPage() {
   const navigate = useNavigate();
   const { data, isLoading, error, refetch } = useLeadWorkspace(id);
   const logCall = useLogCall();
-  // Conversation appearance (SRS 3.4). Falls back to the defaults while the
+  // Conversation appearance. Falls back to the defaults while the
   // query is in flight so the timeline never renders unstyled.
   const { data: appearance } = useChatAppearance();
   const chatDensity = appearance?.chatDensity ?? "comfortable";

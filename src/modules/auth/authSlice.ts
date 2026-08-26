@@ -14,7 +14,7 @@ export type AuthUser = {
   updatedAt?: string;
 
   /**
-   * Employment record (SRS 3.1). Present only on the admin user-management
+   * Employment record. Present only on the admin user-management
    * responses — login and /auth/me deliberately do not carry it, so salary
    * figures are not sitting in every signed-in browser's cache.
    */

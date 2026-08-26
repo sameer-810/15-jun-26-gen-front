@@ -14,7 +14,7 @@ const ALL_TABS: { key: ReportName; label: string; roles: string[] }[] = [
   { key: "leads", label: "Leads", roles: ["admin", "manager", "sales"] },
   { key: "follow-ups", label: "Follow-ups", roles: ["admin", "manager", "sales"] },
   { key: "inventory", label: "Inventory", roles: ["admin", "manager", "inventory"] },
-  // SRS 3.2 — daily answered vs unanswered per employee. A sales exec may open
+  // daily answered vs unanswered per employee. A sales exec may open
   // it; the server narrows the rows to their own calls.
   { key: "call-activity", label: "Call Activity", roles: ["admin", "manager", "sales"] },
 ];
@@ -56,6 +56,7 @@ function SummaryChips({ summary }: { summary: Record<string, unknown> }) {
 
 export function ReportsPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
+  const canExport = role === "admin";
   const isMobile = useIsMobile();
   const tabs = useMemo(
     () => ALL_TABS.filter((t) => (role ? t.roles.includes(role) : false)),
@@ -137,12 +138,16 @@ export function ReportsPage() {
             </label>
           </>
         )}
-        <button
-          onClick={onExport}
-          className="pg-tap flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:ml-auto md:min-h-0 md:w-auto md:px-4 md:py-2"
-        >
-          <Download className="h-4 w-4" /> Export Excel
-        </button>
+        {/* Downloads are admin-only (client rule, 26 Aug). The API enforces it
+            too — hiding the button is the courtesy, not the control. */}
+        {canExport && (
+          <button
+            onClick={onExport}
+            className="pg-tap flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 md:ml-auto md:min-h-0 md:w-auto md:px-4 md:py-2"
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </button>
+        )}
       </div>
 
       {data?.summary && <SummaryChips summary={data.summary} />}

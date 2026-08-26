@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
-import { MessageCircle, Mail, Paperclip, Info, ExternalLink } from "lucide-react";
+import { MessageCircle, Mail, Paperclip, Info, ExternalLink, Zap } from "lucide-react";
 import { FormDialog } from "@/modules/common/FormDialog";
-import { useMessagingCapabilities, useSendMessage, useTemplates } from "../hooks/useMessaging";
+import {
+  useMessagingCapabilities,
+  useSendMessage,
+  useTemplates,
+  useMostUsedTemplates,
+} from "../hooks/useMessaging";
 import { useQuotations } from "@/modules/quotation/hooks/useQuotations";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import type { MessageChannel } from "../types";
 
 /**
- * Compose and send a WhatsApp message or email to a customer — change request
+ * Compose and send a WhatsApp message or email to a customer — the client's brief
  * points 1 and 2.
  *
  * Two send paths, chosen by the server:
@@ -36,7 +41,7 @@ interface Props {
    * Document to share, when the caller already knows which one (e.g. sending
    * from a quotation row). Sent as an attachment or a public link.
    * Left unset when sending from a lead — the dialog then offers that lead's
-   * own documents to attach, which is point 1's "generate a quotation and send
+   * own documents to attach — "generate a quotation and send
    * it to the same lead phone number".
    */
   documentId?: string;
@@ -56,6 +61,12 @@ export function SendMessageDialog({
 }: Props) {
   const { data: caps } = useMessagingCapabilities();
   const { data: templates } = useTemplates({ kind: channel, activeOnly: true, limit: 50 }, open);
+  // The one the team actually reaches for, offered as a single tap.
+  const { data: mostUsed, isPending: quickPending } = useMostUsedTemplates(
+    { kind: channel, limit: 1 },
+    open,
+  );
+  const quick = mostUsed?.[0];
   const sendMutation = useSendMessage();
 
   const [templateId, setTemplateId] = useState("");
@@ -100,12 +111,25 @@ export function SendMessageDialog({
     }
   }, [templateId, templates]);
 
-  // Offer the default template the first time the list arrives.
+  /*
+    Offer a template the first time the list arrives — unless there is a
+    most-used one to offer as a quick pick instead.
+
+    Auto-selecting *and* showing the quick button would be pointless: the button
+    hides once its template is chosen, so it would never appear. Leaving the
+    dropdown empty makes the quick button the one-tap path it is meant to be,
+    and the dropdown stays there for anything else.
+  */
   useEffect(() => {
     if (!open || templateId || !templates?.items.length) return;
+    // Wait for the ranking before deciding. Without this the two queries race:
+    // the template list lands first, this picks the default, and the quick
+    // button then has nothing left to offer.
+    if (quickPending) return;
+    if (quick) return;
     const preferred = templates.items.find((t) => t.isDefault) ?? templates.items[0];
     setTemplateId(preferred.id);
-  }, [open, templates, templateId]);
+  }, [open, templates, templateId, quick, quickPending]);
 
   async function send() {
     if (!body.trim() && !templateId) {
@@ -194,6 +218,27 @@ export function SendMessageDialog({
         </div>
 
         <div>
+          {/*
+            Quick pick, above the dropdown rather than inside it. The dropdown
+            is a list of equals; this says "the one you almost always want" and
+            saves opening it at all. Hidden once it is already selected — a
+            button that does nothing is worse than no button.
+          */}
+          {quick && quick.id !== templateId && (
+            <button
+              type="button"
+              data-testid="quick-template"
+              onClick={() => setTemplateId(quick.id)}
+              title={`Used ${quick.uses} time${quick.uses === 1 ? "" : "s"}`}
+              className="mb-2 flex w-full items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+            >
+              <Zap className="h-3.5 w-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">Quick: {quick.name}</span>
+              <span className="shrink-0 font-mono text-xs tabular-nums opacity-70">
+                {quick.uses}×
+              </span>
+            </button>
+          )}
           <label
             className="mb-1 block text-xs font-medium text-muted-foreground"
             htmlFor="send-template"

@@ -37,6 +37,7 @@ export function InventoryListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canManage = role === "admin" || role === "inventory";
   const canDelete = role === "admin";
+  const canExport = role === "admin";
 
   const [fuelType, setFuelType] = useState<FuelType | "">("");
   const [lowOnly, setLowOnly] = useState(false);
@@ -119,15 +120,18 @@ export function InventoryListPage() {
                 <Upload className="h-4 w-4" />
                 <span className="hidden md:inline">Import Excel</span>
               </button>
-              <button
-                onClick={onExport}
-                aria-label="Export Excel"
-                title="Export Excel"
-                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
-              >
-                <Download className="h-4 w-4" />
-                <span className="hidden md:inline">Export Excel</span>
-              </button>
+              {/* Admin-only download (client rule, 26 Aug); the API enforces it too. */}
+              {canExport && (
+                <button
+                  onClick={onExport}
+                  aria-label="Export Excel"
+                  title="Export Excel"
+                  className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden md:inline">Export Excel</span>
+                </button>
+              )}
             </>
           ) : undefined
         }

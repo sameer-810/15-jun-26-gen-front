@@ -56,7 +56,7 @@ export type Lead = {
   createdBy: UserRef;
   nextFollowUpDate?: string;
   followUps: FollowUp[];
-  /** Calling record (SRS 3.2) — denormalised from the activity log. */
+  /** Calling record — denormalised from the activity log. */
   lastCallOutcome?:
     | "connected"
     | "no_answer"
@@ -69,12 +69,18 @@ export type Lead = {
   callCount?: number;
   convertedAt?: string;
   saleId?: string | null;
+  /**
+   * Recycle bin. Both null on a live lead. `purgeAt` is also null for a lead
+   * deleted before the 7-day policy existed — those are never auto-removed.
+   */
+  deletedAt?: string | null;
+  purgeAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
 /**
- * The answered/unanswered toggle (SRS 3.2).
+ * The answered/unanswered toggle.
  *
  * `not_called` is a third bucket, not an absence of filter. A lead nobody has
  * rung and a lead that rang out mean opposite things to a salesperson — one is

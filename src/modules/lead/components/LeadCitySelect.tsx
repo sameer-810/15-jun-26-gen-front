@@ -3,7 +3,7 @@ import { useLeadCities } from "../hooks/useLeads";
 import { useLocations } from "@/modules/location/useLocations";
 
 /**
- * Location filter for the Leads list — point 9's "wherever location is added,
+ * Location filter for the Leads list — "wherever location is added,
  * a dropdown instead of an input".
  *
  * Leads are not Inventory or Sales. Their city arrives from IndiaMART and is

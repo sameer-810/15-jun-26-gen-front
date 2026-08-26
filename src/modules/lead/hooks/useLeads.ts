@@ -12,6 +12,9 @@ import {
   getAssignableUsers,
   getLeadCityFacets,
   convertLead,
+  listDeletedLeads,
+  restoreLead,
+  purgeLead,
   type ConvertLeadPayload,
 } from "../api/leadApi";
 import type { LeadListQuery, LeadCreatePayload, LeadListResult } from "../types";
@@ -105,5 +108,33 @@ export function useAssignableUsers(enabled = true) {
     queryFn: getAssignableUsers,
     enabled,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** The recycle bin listing. */
+export function useDeletedLeads(query: { search?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ["leads", "trash", query],
+    queryFn: () => listDeletedLeads(query),
+  });
+}
+
+export function useRestoreLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreLead,
+    onSuccess: () => {
+      // Both lists move: one gains the lead, the other loses it.
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}
+
+export function usePurgeLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: purgeLead,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }

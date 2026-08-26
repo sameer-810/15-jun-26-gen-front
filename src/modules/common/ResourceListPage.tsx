@@ -63,7 +63,12 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
   searchPlaceholder?: string;
   minTableWidth?: string;
   emptyText?: string;
-  deleteConfirmText?: string;
+  /**
+   * Copy for the delete confirmation. Pass a function to name the record being
+   * deleted — "Delete QTN-1042?" is a far better prompt than "Delete this
+   * record?" when several rows look alike.
+   */
+  deleteConfirmText?: string | ((item: TItem) => string);
   hideActionsColumn?: boolean;
   hideCreateButton?: boolean;
   /**
@@ -227,6 +232,15 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   // Memoised so downstream useMemo/useEffect deps don't churn on every render
   // (the `?? []` fallback would otherwise be a fresh array each time).
   const items = useMemo(() => data?.items ?? [], [data]);
+
+  // Resolved here rather than at the confirm state, because it needs `items`.
+  const pendingDelete = items.find((i) => i.id === confirmDelete);
+  const confirmMessage =
+    typeof deleteConfirmText === "function"
+      ? pendingDelete
+        ? deleteConfirmText(pendingDelete)
+        : "Delete this record? This cannot be undone."
+      : deleteConfirmText;
   const total = data?.meta?.total ?? 0;
   const totalPages = Math.max(1, data?.meta?.totalPages ?? 1);
   const hasNext = data?.meta?.hasNextPage ?? false;
@@ -891,7 +905,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="pg-overlay w-full max-w-sm p-6">
             <h3 className="text-base font-semibold text-foreground">Confirm Delete</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{deleteConfirmText}</p>
+            <p className="mt-2 text-sm text-muted-foreground">{confirmMessage}</p>
             <div className="mt-5 flex justify-end gap-3">
               <button
                 onClick={() => setConfirmDelete(null)}

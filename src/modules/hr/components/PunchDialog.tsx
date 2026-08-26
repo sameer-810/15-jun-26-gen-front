@@ -5,7 +5,7 @@ import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 
 /**
- * Photo capture for attendance (SRS 3.1).
+ * Photo capture for attendance.
  *
  * Three things this deliberately does not do:
  *

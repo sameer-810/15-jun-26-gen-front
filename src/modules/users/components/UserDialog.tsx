@@ -20,7 +20,7 @@ const schema = z.object({
   phone: z.string().trim().optional(),
   password: z.string().optional(),
 
-  // ── Employment record (SRS 3.1) ──────────────────────────────────────────
+  // ── Employment record ──────────────────────────────────────────
   joiningDate: z.string().optional(),
   monthlyGross: z.string().optional(),
   incentiveRate: z.string().optional(),

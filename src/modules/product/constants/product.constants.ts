@@ -2,7 +2,7 @@ import type { ProductFuelType, ProductPhase } from "../types";
 
 /**
  * The spec labels used by the sample quotation PDF the client shared
- * (Change Request point 16). New products are seeded with these rows so the
+ * New products are seeded with these rows so the
  * catalog is filled in a consistent shape.
  * Mirrors DEFAULT_SPEC_LABELS in the backend product model.
  */

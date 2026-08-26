@@ -31,6 +31,9 @@ const LeadListPage = lazy(() =>
 const LeadDetailPage = lazy(() =>
   import("./modules/lead/pages/LeadDetailPage").then((m) => ({ default: m.LeadDetailPage })),
 );
+const LeadTrashPage = lazy(() =>
+  import("./modules/lead/pages/LeadTrashPage").then((m) => ({ default: m.LeadTrashPage })),
+);
 const CapacityCalculatorPage = lazy(() =>
   import("./modules/capacity/pages/CapacityCalculatorPage").then((m) => ({
     default: m.CapacityCalculatorPage,
@@ -86,6 +89,8 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="leads" element={<LeadListPage />} />
+          {/* Before "leads/:id" so "trash" is never read as a lead id. */}
+          <Route path="leads/trash" element={<LeadTrashPage />} />
           <Route path="leads/:id" element={<LeadDetailPage />} />
           <Route path="capacity-calculator" element={<CapacityCalculatorPage />} />
           <Route path="catalog" element={<ProductListPage />} />

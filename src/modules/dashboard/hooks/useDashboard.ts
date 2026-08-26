@@ -10,7 +10,7 @@ export function useDashboard() {
 }
 
 /**
- * GST vs Non-GST revenue (SRS 3.3).
+ * GST vs Non-GST revenue.
  *
  * A separate query rather than more fields on the dashboard payload: it spans
  * twelve months of sales, and the main dashboard refetches every minute. Paying

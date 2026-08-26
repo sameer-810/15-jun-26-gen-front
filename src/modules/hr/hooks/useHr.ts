@@ -83,7 +83,7 @@ export function useClearLeave() {
  * One month of everything for one person: attendance, pay, incentive, targets.
  *
  * The same hook backs both the employee's own "My Performance" screen and the
- * admin's view of that employee — which is how SRS 3.5's "must mirror exactly
+ * admin's view of that employee — which is how the requirement's "must mirror exactly
  * what the Admin sees" is kept true. There is one endpoint and one shape; the
  * server decides whose data comes back.
  */

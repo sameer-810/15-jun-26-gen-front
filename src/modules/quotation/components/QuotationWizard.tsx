@@ -11,7 +11,7 @@ import type { ProductOption } from "@/modules/product/types";
 import type { DocType, Quotation, QuotationItemPayload, QuotationPrefill } from "../types";
 
 /**
- * "Create your customized quotation" — Change Request point 15.
+ * "Create your customized quotation".
  *
  * A four-step wizard over the catalog, mirroring the IndiaMART flow the client
  * shared: pick products, confirm terms, verify the customer block, generate.

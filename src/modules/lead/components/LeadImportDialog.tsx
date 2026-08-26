@@ -8,7 +8,7 @@ import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 
 /**
- * Bulk lead import — change request (11 Aug) point 7: "In import lead option I
+ * Bulk lead import — the client's brief: "In import lead option I
  * need data format instruction before adding the leads."
  *
  * The instructions are fetched from the server rather than written here, so the

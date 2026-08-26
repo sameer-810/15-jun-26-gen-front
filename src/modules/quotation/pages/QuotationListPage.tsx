@@ -9,6 +9,7 @@ import {
   Wand2,
   Mail,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { Sheet } from "@/shared/components/Sheet";
@@ -58,7 +59,7 @@ function DocSheetAction({
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  tone?: "neutral" | "primary";
+  tone?: "neutral" | "primary" | "danger";
 }) {
   return (
     <button
@@ -67,7 +68,11 @@ function DocSheetAction({
       disabled={disabled}
       className={cn(
         "pg-tap flex w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors disabled:opacity-40",
-        tone === "primary" ? "text-primary hover:bg-primary/10" : "text-foreground hover:bg-accent",
+        tone === "primary"
+          ? "text-primary hover:bg-primary/10"
+          : tone === "danger"
+            ? "text-destructive hover:bg-destructive/10"
+            : "text-foreground hover:bg-accent",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -88,7 +93,7 @@ export function QuotationListPage() {
   const convertMutation = useConvertQuotation();
   const [confirmIssue, setConfirmIssue] = useState<Quotation | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
-  // Point 2 — share the document itself, not a note promising one.
+  // Share the document itself, not a note promising one.
   const [share, setShare] = useState<{ doc: Quotation; channel: MessageChannel } | null>(null);
   // ResourceListPage owns its own paging/query state, so bumping this key is
   // how an outside creation (the wizard) forces it to reload.
@@ -97,6 +102,25 @@ export function QuotationListPage() {
   // from it (ResourceListPage only owns the create dialog).
   const [moreFor, setMoreFor] = useState<Quotation | null>(null);
   const [editDoc, setEditDoc] = useState<Quotation | null>(null);
+  /*
+    Mobile delete. The action sheet is rendered outside ResourceListPage, so it
+    cannot reach that component's confirm dialog — it carries its own, driven by
+    the same mutation the desktop row uses.
+  */
+  const [confirmDelete, setConfirmDelete] = useState<Quotation | null>(null);
+  const deleteMutation = useDeleteQuotation();
+
+  async function doDelete() {
+    if (!confirmDelete) return;
+    try {
+      await deleteMutation.mutateAsync(confirmDelete.id);
+      toast.success(`${confirmDelete.docNumberFormatted} deleted`);
+      setListRefreshKey((k) => k + 1);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    }
+    setConfirmDelete(null);
+  }
 
   async function convertToInvoice(q: Quotation) {
     try {
@@ -171,7 +195,7 @@ export function QuotationListPage() {
       </div>
 
       <ResourceListPage<Quotation, QuotationListQuery>
-        /* Point 15 — the catalog-driven builder, alongside the plain dialog. */
+        /* The catalog-driven builder, alongside the plain dialog. */
         headerActions={
           <button
             onClick={() => setWizardOpen(true)}
@@ -198,7 +222,9 @@ export function QuotationListPage() {
         // editor — the same thing the row's Edit button does.
         rowOpensEditor
         emptyText="No documents yet. Create your first one."
-        deleteConfirmText="Delete this document? This cannot be undone."
+        deleteConfirmText={(q) =>
+          `Are you sure you want to delete ${q.docNumberFormatted}? This cannot be undone.`
+        }
         columns={[
           {
             header: "Number",
@@ -258,11 +284,12 @@ export function QuotationListPage() {
           page,
           limit,
         })}
-        renderActions={(q, onEdit) => (
+        renderActions={(q, onEdit, onRequestDelete) => (
           <div className="flex items-center gap-1">
             <button
               onClick={() => onEdit(q)}
               disabled={q.isIssued}
+              data-testid={`edit-${q.id}`}
               className="rounded-md border border-border bg-background p-1.5 hover:bg-accent transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               title={q.isIssued ? "Issued invoices cannot be edited" : "Edit"}
             >
@@ -321,6 +348,27 @@ export function QuotationListPage() {
                 title="Issue this invoice — it becomes read-only"
               >
                 <Lock className="h-3.5 w-3.5" /> Issue
+              </button>
+            )}
+
+            {/*
+              Delete. Admin only, and never for an issued tax invoice — GST law
+              allows a correction only via a credit note, so the server refuses
+              it too and this button just stops the request being made.
+            */}
+            {canDelete && (
+              <button
+                onClick={() => onRequestDelete(q.id)}
+                disabled={q.isIssued}
+                data-testid={`delete-${q.id}`}
+                className="rounded-md border border-destructive/30 bg-destructive/10 p-1.5 text-destructive transition-colors hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-40"
+                title={
+                  q.isIssued
+                    ? "An issued invoice cannot be deleted — raise a credit note"
+                    : `Delete ${q.docNumberFormatted}`
+                }
+              >
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -455,6 +503,17 @@ export function QuotationListPage() {
                 }}
               />
             )}
+            {canDelete && !moreFor.isIssued && (
+              <DocSheetAction
+                icon={Trash2}
+                label="Delete"
+                tone="danger"
+                onClick={() => {
+                  setConfirmDelete(moreFor);
+                  setMoreFor(null);
+                }}
+              />
+            )}
           </div>
         )}
       </Sheet>
@@ -488,6 +547,35 @@ export function QuotationListPage() {
         documentId={share?.doc.id}
         documentLabel={share?.doc.docNumberFormatted}
       />
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="pg-overlay w-full max-w-md p-6" role="dialog" aria-modal="true">
+            <h3 className="text-base font-semibold text-foreground">
+              Delete {confirmDelete.docNumberFormatted}?
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This removes the document and its PDF. It cannot be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={doDelete}
+                disabled={deleteMutation.isPending}
+                data-testid="confirm-delete-doc"
+                className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmIssue && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

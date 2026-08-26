@@ -160,7 +160,7 @@ export type QuotationCreatePayload = {
   status?: DocStatus;
 };
 
-/** Last billing/shipping block used for a customer — point 6's "auto fetch". */
+/** Last billing/shipping block used for a customer — "auto fetch". */
 export type CustomerLookup = {
   sourceDocNumber: string;
   customerName: string;

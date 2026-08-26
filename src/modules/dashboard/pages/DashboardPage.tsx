@@ -25,7 +25,7 @@ import type { LeadStatus } from "@/modules/lead/types";
 
 const AMBER = "#F5A623";
 const GREEN = "#16A34A";
-// GST split (SRS 3.3). Cobalt for GST because it is the primary, compliant
+// GST split. Cobalt for GST because it is the primary, compliant
 // path; a desaturated teal for non-GST so the two are distinguishable without
 // either reading as an alarm; grey for what nobody has classified yet.
 const GST_COLOR = "#1C50C8";
@@ -126,7 +126,7 @@ function PipelineFunnel({
 }
 
 /**
- * Revenue split by how it was billed — SRS 3.3.
+ * Revenue split by how it was billed.
  *
  * Stacked bars rather than two side-by-side series: the question this answers
  * is "how much of our revenue goes through GST", which is a composition, and

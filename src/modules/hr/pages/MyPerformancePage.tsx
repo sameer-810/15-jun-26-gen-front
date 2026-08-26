@@ -68,7 +68,7 @@ function TargetBar({ row }: { row: TargetRow }) {
 }
 
 /**
- * "My Performance" — SRS 3.5.
+ * "My Performance".
  *
  * The requirement is that an employee sees exactly what the admin sees about
  * them. That is satisfied structurally rather than by discipline: this one page

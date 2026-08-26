@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { http } from "@/shared/api/http";
 
 /**
- * The Location master list — change request (11 Aug) point 9: "location
+ * The Location master list — "location
  * template need to add in template section so wherever location added need
  * dropdown instead of input".
  */

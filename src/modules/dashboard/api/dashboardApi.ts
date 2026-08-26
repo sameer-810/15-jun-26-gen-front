@@ -27,7 +27,7 @@ export type DashboardMetrics = {
   }>;
 };
 
-/** One month of revenue, split by how it was billed (SRS 3.3). */
+/** One month of revenue, split by how it was billed. */
 export type SalesAnalyticsPoint = {
   month: string;
   label: string;

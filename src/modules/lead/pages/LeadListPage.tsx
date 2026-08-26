@@ -147,7 +147,7 @@ export function LeadListPage() {
   const [sendTo, setSendTo] = useState<{ lead: Lead; channel: MessageChannel } | null>(null);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  // Answered / unanswered toggle (SRS 3.2). "" is all leads.
+  // Answered / unanswered toggle. "" is all leads.
   const [callFilter, setCallFilter] = useState<CallFilter | "">("");
   const logCall = useLogCall();
   // The lead we are waiting on a call outcome for. See the call button below.
@@ -247,19 +247,32 @@ export function LeadListPage() {
   return (
     <>
       <ResourceListPage<Lead, LeadListQuery>
-        /* Point 7 — import with the data-format instructions shown first. */
+        /* Import, with the data-format instructions shown first. */
         headerActions={
           role === "admin" || role === "manager" ? (
-            <button
-              onClick={() => setImportOpen(true)}
-              data-testid="open-lead-import"
-              aria-label="Import Leads"
-              title="Import Leads"
-              className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-1.5"
-            >
-              <Upload className="h-4 w-4" />
-              <span className="hidden md:inline">Import Leads</span>
-            </button>
+            <>
+              <button
+                onClick={() => setImportOpen(true)}
+                data-testid="open-lead-import"
+                aria-label="Import Leads"
+                title="Import Leads"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-1.5"
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden md:inline">Import Leads</span>
+              </button>
+              {/* The recycle bin. Deleted leads are recoverable for 7 days. */}
+              <Link
+                to="/leads/trash"
+                data-testid="open-lead-trash"
+                aria-label="Recycle Bin"
+                title="Recycle Bin — deleted leads, recoverable for 7 days"
+                className="pg-tap flex items-center justify-center gap-1.5 rounded-lg border border-border bg-card text-sm font-medium transition-colors hover:bg-accent md:min-h-0 md:min-w-0 md:px-3 md:py-1.5"
+              >
+                <Trash2 className="h-4 w-4" />
+                <span className="hidden md:inline">Recycle Bin</span>
+              </Link>
+            </>
           ) : undefined
         }
         activeFilterCount={activeFilterCount}
@@ -277,7 +290,7 @@ export function LeadListPage() {
         deleteConfirmText="Delete this lead? This removes it from the pipeline (history is retained)."
         columns={[
           {
-            // Point 8 — date and time in the first row. For an imported lead the
+            // Date and time in the first row. For an imported lead the
             // enquiry timestamp at the source is the one the team cares about,
             // not when our poller happened to see it.
             header: "Received",
@@ -288,7 +301,7 @@ export function LeadListPage() {
             ),
           },
           {
-            // Point 13 — clicking the lead opens its detail workspace.
+            // Clicking the lead opens its detail workspace.
             header: "Customer",
             getValue: (l) => (
               <div>

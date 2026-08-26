@@ -7,7 +7,7 @@ export type ProductSpec = { label: string; value: string };
 
 /**
  * Exactly what the quotation line-item combobox writes into a row when a
- * product is picked (Change Request point 4). Computed server-side so the
+ * product is picked. Computed server-side so the
  * auto-fill rule lives in one place.
  */
 export type QuotationDefaults = {

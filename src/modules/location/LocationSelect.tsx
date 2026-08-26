@@ -1,7 +1,7 @@
 import { useLocations } from "./useLocations";
 
 /**
- * Location dropdown fed by the master list — change request (11 Aug) point 9,
+ * Location dropdown fed by the master list,
  * replacing the free-text box that let one yard be spelled three ways.
  *
  * A value that is not (or is no longer) in the list is kept as an extra option

@@ -36,6 +36,18 @@ export async function getDocumentLink(documentId: string) {
 
 // ── Templates ─────────────────────────────────────────────────────────────
 
+/**
+ * Templates ranked by how often they have actually been sent.
+ * Counted from the message log server-side, so it reflects real use rather
+ * than a field somebody has to remember to bump.
+ */
+export async function listMostUsedTemplates(params: { kind?: TemplateKind; limit?: number }) {
+  const res = await http.get<{ data: (Template & { uses: number })[] }>("/templates/most-used", {
+    params,
+  });
+  return res.data.data;
+}
+
 export async function listTemplates(params: {
   kind?: TemplateKind;
   search?: string;

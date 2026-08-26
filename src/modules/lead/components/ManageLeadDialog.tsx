@@ -29,7 +29,7 @@ import type { Reminder } from "../types.labels";
 
 /**
  * "Manage Lead — Labels, Notes & Reminders", the panel from the IndiaMART
- * screenshot in Change Request point 11. One dialog covering the three things
+ * screenshot in the client's brief. One dialog covering the three things
  * a sales exec does to a lead between calls.
  */
 

@@ -8,7 +8,7 @@ import { formatDateTime } from "@/lib/utils";
 /**
  * "What do I owe someone a call about?" — my pending reminders, soonest first,
  * with the overdue ones highlighted. Sits on the dashboard so the reminders set
- * in the Manage Lead panel (Change Request point 11) actually resurface.
+ * in the Manage Lead panel (the client's brief) actually resurface.
  */
 export function RemindersPanel({ limit = 6 }: { limit?: number }) {
   const { data, isLoading } = useReminders({ status: "pending", mine: "true", limit });

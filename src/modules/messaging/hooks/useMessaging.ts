@@ -5,6 +5,7 @@ import {
   sendMessage,
   getDocumentLink,
   listTemplates,
+  listMostUsedTemplates,
   getTemplateMeta,
   createTemplate,
   updateTemplate,
@@ -55,6 +56,18 @@ export function useTemplates(params: Parameters<typeof listTemplates>[0] = {}, e
     queryFn: () => listTemplates(params),
     enabled,
     staleTime: 60_000,
+  });
+}
+
+/** The most-sent templates for a channel — drives the quick button. */
+export function useMostUsedTemplates(
+  params: { kind?: TemplateKind; limit?: number } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ["templates", "most-used", params],
+    queryFn: () => listMostUsedTemplates(params),
+    enabled,
   });
 }
 

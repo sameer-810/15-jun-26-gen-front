@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Calculator, FileText, Plus, Trash2, Zap } from "lucide-react";
-import { useCalculateCapacity } from "../hooks/useCapacity";
+import { useCalculateCapacity, useAppliancePresets } from "../hooks/useCapacity";
 import type { ApplianceCategory, ApplianceInput, CapacityResult } from "../types";
 import { useGensetSuggestions } from "@/modules/product/hooks/useProducts";
 import { useLeadWorkspace } from "@/modules/lead/hooks/useLeadWorkspace";
@@ -28,12 +28,19 @@ const CATEGORIES = Object.keys(CATEGORY_LABELS) as ApplianceCategory[];
 const inputCls =
   "w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring transition";
 
-type Row = { category: ApplianceCategory; name: string; quantity: number; watts: number };
+type Row = {
+  category: ApplianceCategory;
+  name: string;
+  quantity: number;
+  watts: number;
+  /** Surge draw. Undefined means "use the category default". */
+  startingWatts?: number;
+};
 
 const STARTER_ROWS: Row[] = [
-  { category: "lighting", name: "LED lights", quantity: 10, watts: 15 },
-  { category: "fan", name: "Ceiling fans", quantity: 5, watts: 75 },
-  { category: "ac", name: "1.5 Ton AC", quantity: 1, watts: 1500 },
+  { category: "lighting", name: "LED lights", quantity: 10, watts: 15, startingWatts: 15 },
+  { category: "fan", name: "Ceiling fans", quantity: 5, watts: 75, startingWatts: 110 },
+  { category: "ac", name: "1.5 Ton AC", quantity: 1, watts: 3800, startingWatts: 6000 },
 ];
 
 /**
@@ -41,20 +48,32 @@ const STARTER_ROWS: Row[] = [
  * rating — the sizing itself, written out so the customer can see the working.
  */
 function describeLoad(result: CapacityResult): string {
-  const load = result.items.map((it) => `${it.quantity} x ${it.name} (${it.watts} W)`).join(", ");
+  // Itemised load schedule: running and starting watts
+  // per line, so the customer can audit the sizing rather than trust it.
+  const load = result.items
+    .map(
+      (it) =>
+        `${it.quantity} x ${it.name} — ${it.watts} W running` +
+        (it.startingFactor > 1 ? `, ${it.startingWatts} W starting` : ""),
+    )
+    .join("; ");
+
   return [
     `${result.recommendedStandardKva} kVA diesel generator set`,
     `Sized for a running load of ${result.runningKva} kVA and a peak of ${result.peakKva} kVA ` +
       `at ${result.inputs.powerFactor} power factor, including a ${result.inputs.safetyMarginPct}% safety margin.`,
     `Connected load: ${load}.`,
-  ].join("\n");
+    result.surgeContributor ? `Largest start-up surge comes from ${result.surgeContributor}.` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function CapacityCalculatorPage() {
   const isMobile = useIsMobile();
   const [params] = useSearchParams();
   // Reached from a lead's "Calculate" button — the quotation then carries the
-  // customer through, so nothing is retyped (point 4: calculate, then quote).
+  // customer through, so nothing is retyped: calculate, then quote.
   const leadId = params.get("leadId") ?? undefined;
   const { data: workspace } = useLeadWorkspace(leadId);
   const lead = workspace?.lead;
@@ -66,6 +85,9 @@ export function CapacityCalculatorPage() {
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const calc = useCalculateCapacity();
+  // The reference application chart. Picking a row fills the watts
+  // *and* the surge, which is the part people cannot look up from memory.
+  const { data: presets } = useAppliancePresets();
 
   // Only gensets that can actually carry the calculated load, smallest first.
   const { data: suggestions } = useGensetSuggestions(result?.recommendedStandardKva ?? null);
@@ -105,6 +127,10 @@ export function CapacityCalculatorPage() {
         name: r.name || CATEGORY_LABELS[r.category],
         quantity: Number(r.quantity),
         watts: Number(r.watts),
+        startingWatts:
+          r.startingWatts === undefined || r.startingWatts === null
+            ? undefined
+            : Number(r.startingWatts),
       }));
     if (appliances.length === 0) {
       toast.error("Add at least one appliance with watts and quantity");
@@ -145,6 +171,53 @@ export function CapacityCalculatorPage() {
       </div>
 
       <div className="pg-tile">
+        {/*
+          Add straight from the reference chart. One control rather than a
+          browsable table: the chart is 55 rows and nobody reads it, they look
+          up the one appliance they have. Picking a row fills the running and
+          starting watts together, which is the pair that gets guessed wrong.
+        */}
+        {presets && presets.items.length > 0 && (
+          <label className="mb-3 block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">
+              Add from the application chart
+            </span>
+            <select
+              data-testid="preset-picker"
+              value=""
+              onChange={(e) => {
+                const preset = presets.items.find((x) => x.name === e.target.value);
+                if (!preset) return;
+                setRows((r) => [
+                  ...r,
+                  {
+                    category: preset.category,
+                    name: preset.name,
+                    quantity: 1,
+                    watts: preset.runningWatts,
+                    startingWatts: preset.startingWatts,
+                  },
+                ]);
+              }}
+              className={inputCls}
+            >
+              <option value="">Pick an appliance to add…</option>
+              {presets.groups.map((g) => (
+                <optgroup key={g} label={g}>
+                  {presets.items
+                    .filter((x) => x.group === g)
+                    .map((x) => (
+                      <option key={x.name} value={x.name}>
+                        {x.name} — {x.runningWatts} W run
+                        {x.surgeFactor > 1 ? ` / ${x.startingWatts} W start` : ""}
+                      </option>
+                    ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        )}
+
         {/*
           The load list, stacked below `md`.
 
@@ -217,7 +290,7 @@ export function CapacityCalculatorPage() {
                     </label>
                     <label className="block flex-1">
                       <span className="mb-1 block text-xs font-medium text-muted-foreground">
-                        Watts (each)
+                        Running W
                       </span>
                       <input
                         type="number"
@@ -225,6 +298,25 @@ export function CapacityCalculatorPage() {
                         className={`${inputCls} no-spinner tabular-nums`}
                         value={row.watts}
                         onChange={(e) => updateRow(i, { watts: Number(e.target.value) })}
+                      />
+                    </label>
+                    <label className="block flex-1">
+                      <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                        Starting W
+                      </span>
+                      {/* Blank = use the category default surge. */}
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder="auto"
+                        className={`${inputCls} no-spinner tabular-nums`}
+                        value={row.startingWatts ?? ""}
+                        onChange={(e) =>
+                          updateRow(i, {
+                            startingWatts:
+                              e.target.value === "" ? undefined : Number(e.target.value),
+                          })
+                        }
                       />
                     </label>
                   </div>
@@ -241,7 +333,8 @@ export function CapacityCalculatorPage() {
                 <th className="px-2 py-2 font-medium">Category</th>
                 <th className="px-2 py-2 font-medium">Appliance</th>
                 <th className="px-2 py-2 font-medium w-24">Qty</th>
-                <th className="px-2 py-2 font-medium w-32">Watts (each)</th>
+                <th className="px-2 py-2 font-medium w-32">Running W (each)</th>
+                <th className="px-2 py-2 font-medium w-32">Starting W (each)</th>
                 <th className="px-2 py-2 w-10"></th>
               </tr>
             </thead>
@@ -290,9 +383,26 @@ export function CapacityCalculatorPage() {
                       type="number"
                       min={0}
                       className={inputCls}
-                      aria-label={`Appliance ${i + 1} watts each`}
+                      aria-label={`Appliance ${i + 1} running watts each`}
                       value={row.watts}
                       onChange={(e) => updateRow(i, { watts: Number(e.target.value) })}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {/* Blank means "use the category default surge" — stated in
+                        the placeholder so an empty box is not read as zero. */}
+                    <input
+                      type="number"
+                      min={0}
+                      className={inputCls}
+                      aria-label={`Appliance ${i + 1} starting watts each`}
+                      placeholder="auto"
+                      value={row.startingWatts ?? ""}
+                      onChange={(e) =>
+                        updateRow(i, {
+                          startingWatts: e.target.value === "" ? undefined : Number(e.target.value),
+                        })
+                      }
                     />
                   </td>
                   <td className="px-2 py-1.5">

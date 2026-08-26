@@ -23,7 +23,7 @@ export async function bulkDeleteLeads(ids: string[]) {
 }
 
 /**
- * Reassign the selected leads (SRS 3.2). `assignedTo: null` returns them to the
+ * Reassign the selected leads. `assignedTo: null` returns them to the
  * pool. Admin and manager only — the server enforces this too.
  */
 export async function bulkAssignLeads(ids: string[], assignedTo: string | null) {
@@ -73,4 +73,29 @@ export async function convertLead(id: string, payload: ConvertLeadPayload) {
 export async function getLeadCityFacets(): Promise<{ city: string; count: number }[]> {
   const res = await http.get<{ data: { city: string; count: number }[] }>("/leads/facets/cities");
   return res.data.data;
+}
+
+/**
+ * The recycle bin. Deleted leads stay recoverable for 7 days, after
+ * which a daily sweep on the server removes them for good.
+ *
+ * Admin and manager only. Leads deleted before the retention policy existed
+ * have no `purgeAt` and are never swept — they sit here until someone acts.
+ */
+export async function listDeletedLeads(query: { search?: string; page?: number; limit?: number }) {
+  const res = await http.get<{
+    data: Lead[];
+    meta: { total: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean };
+  }>("/leads/trash", { params: query });
+  return { items: res.data.data, meta: res.data.meta };
+}
+
+export async function restoreLead(id: string) {
+  const res = await http.post<{ data: Lead; message: string }>(`/leads/${id}/restore`);
+  return res.data.data;
+}
+
+/** Irreversible, and admin-only on the server. */
+export async function purgeLead(id: string) {
+  await http.delete(`/leads/${id}/permanent`);
 }

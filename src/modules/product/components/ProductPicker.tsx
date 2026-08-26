@@ -5,11 +5,11 @@ import { formatCurrency } from "@/lib/utils";
 import type { ProductOption } from "../types";
 
 /**
- * Searchable catalog dropdown for a quotation line item — Change Request
- * point 4 ("in quotation description should auto fill from drop down").
+ * Searchable catalog dropdown for a quotation line item — the client's brief
+ * "In quotation description should auto fill from drop down".
  *
  * Deliberately a button + popover rather than a `<select>`: the descriptions
- * are multi-line (point 5's sample runs a dozen lines) and each option needs a
+ * are multi-line (a real sample runs a dozen lines) and each option needs a
  * thumbnail and price, none of which a native select can render. Free text
  * stays available — the caller keeps its own textarea alongside this.
  */

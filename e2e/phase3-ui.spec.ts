@@ -147,8 +147,10 @@ test.describe("Point 10 — Tax Invoice tab and lifecycle", () => {
 
     const row = page.locator("tbody tr", { hasText: inv.docNumberFormatted }).first();
     await expect(row).toContainText("Issued");
-    // Edit is disabled, and the Issue button is gone.
-    await expect(row.getByRole("button", { name: "Edit" })).toBeDisabled();
+    // Edit is disabled, and the Issue button is gone. Keyed on the test id
+    // rather than the title: an icon button's accessible name is its tooltip,
+    // and matching "Edit" as a substring also catches "raise a credit note".
+    await expect(page.getByTestId(`edit-${inv.id}`)).toBeDisabled();
     await expect(page.getByTestId(`issue-${inv.id}`)).toHaveCount(0);
   });
 });

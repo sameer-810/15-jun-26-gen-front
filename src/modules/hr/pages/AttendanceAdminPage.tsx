@@ -39,7 +39,7 @@ function monthBounds(month: string) {
 }
 
 /**
- * Admin attendance and targets (SRS 3.1 / 3.5).
+ * Admin attendance and targets.
  *
  * The screen leads with unresolved days rather than a full month grid, because
  * that is the only part of attendance that needs a human: everything else has

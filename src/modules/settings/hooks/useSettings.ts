@@ -6,7 +6,7 @@ export function useBusinessProfile() {
 }
 
 /**
- * Message appearance (SRS 3.4), for any signed-in user.
+ * Message appearance, for any signed-in user.
  *
  * Cached hard: it is three booleans set once by an admin, read on every lead
  * screen. Refetching it per navigation would be a request per page view for

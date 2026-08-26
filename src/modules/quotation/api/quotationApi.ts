@@ -34,7 +34,7 @@ export async function convertQuotation(id: string, targetType: DocType) {
   return res.data.data;
 }
 
-/** "Auto fetch" (point 6) — the last billing/shipping block for a customer. */
+/** "Auto fetch" — the last billing/shipping block for a customer. */
 export async function lookupCustomer(params: { mobile?: string; name?: string }) {
   const res = await http.get<{ data: CustomerLookup | null }>("/quotations/customer-lookup", {
     params,

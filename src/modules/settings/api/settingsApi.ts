@@ -14,7 +14,7 @@ export type BusinessProfile = {
   defaultSgstRate?: number;
   defaultIgstRate?: number;
   /**
-   * Document numbering (SRS 3.3). Each series is a prefix plus the next number
+   * Document numbering. Each series is a prefix plus the next number
    * to be issued. Quotations and proformas run a simple counter; the tax
    * invoice series additionally resets every financial year, which is a
    * statutory requirement and so is not editable here.
@@ -29,7 +29,7 @@ export type BusinessProfile = {
   invoiceSeriesFy?: string;
 
   /**
-   * Message composer appearance (SRS 3.4).
+   * Message composer appearance.
    *
    * Business-wide rather than per-user on purpose: the product was rejected for
    * looking inconsistent, and per-user dialog theming would rebuild exactly
@@ -42,7 +42,7 @@ export type BusinessProfile = {
   bankAccountNumber?: string;
   bankIfsc?: string;
   defaultTerms?: string[];
-  /** Letterhead artwork rendered on generated PDFs (point 6). */
+  /** Letterhead artwork rendered on generated PDFs. */
   letterheadHeaderUrl?: string;
   letterheadFooterUrl?: string;
   signatureUrl?: string;

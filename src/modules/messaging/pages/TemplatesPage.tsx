@@ -22,7 +22,7 @@ import type { Template, TemplateKind } from "../types";
 
 /**
  * "One section to create the required templates for email, WhatsApp and others
- * (description and T&C)" — change request (11 Aug) point 4, and the IndiaMART
+ * (description and T&C)", and the IndiaMART
  * example asking for a template with an image and a full description that can
  * be renamed and edited.
  */

@@ -16,7 +16,7 @@ export const updateProduct = (id: string, payload: Partial<ProductCreatePayload>
   api.update(id, payload);
 export const deleteProduct = (id: string) => api.remove(id);
 
-/** Compact search used by the quotation line-item combobox (point 4). */
+/** Compact search used by the quotation line-item combobox. */
 export async function searchProductOptions(search: string, limit = 20): Promise<ProductOption[]> {
   const res = await http.get<{ data: ProductOption[] }>("/products/options", {
     params: { search: search || undefined, limit },
@@ -26,7 +26,7 @@ export async function searchProductOptions(search: string, limit = 20): Promise<
 
 /**
  * Catalog gensets rated at or above a calculated load, smallest first — the
- * calculator's hand-off to a quotation (point 4, "first calculate then quote").
+ * calculator's hand-off to a quotation ("first calculate then quote").
  */
 export async function suggestGensets(minKva: number, limit = 4): Promise<ProductOption[]> {
   const res = await http.get<{ data: ProductOption[] }>("/products/options", {
@@ -49,7 +49,7 @@ export async function importProducts(fileBase64: string) {
 
 /**
  * Copy the models already held in Inventory into the catalog, so the quotation
- * description dropdown is useful without re-typing the stock list (point 4).
+ * description dropdown is useful without re-typing the stock list.
  */
 export async function seedCatalogFromInventory() {
   const res = await http.post<{

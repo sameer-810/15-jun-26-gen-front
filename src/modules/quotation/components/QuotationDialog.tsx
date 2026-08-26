@@ -29,7 +29,7 @@ const numCls = `${inputCls} no-spinner text-right tabular-nums`;
  * scrolls horizontally rather than shrinking below them.
  *
  * Description is no longer one of these tracks — it is a full-width textarea
- * above them, because a catalog description runs to many lines (point 5).
+ * above them, because a catalog description runs to many lines.
  */
 const ITEM_GRID = "grid gap-2 grid-cols-[minmax(140px,2fr)_72px_90px_70px_116px_80px_88px_32px]";
 
@@ -215,7 +215,7 @@ export function QuotationDialog({
   }, [itemsKey]);
 
   /**
-   * Apply a catalog product to line item `i` — Change Request point 4.
+   * Apply a catalog product to line item `i`.
    * The field values come from the server (`quotationDefaults`) so the
    * auto-fill rule is defined once, next to the catalog data.
    * shouldDirty/shouldValidate keep the totals preview and validation in step.
@@ -238,7 +238,7 @@ export function QuotationDialog({
   }
 
   /**
-   * Apply a saved description template to line item `i` (point 4). Unlike a
+   * Apply a saved description template to line item `i`. Unlike a
    * catalog product this carries wording only — price, HSN and GST are left
    * alone, so a template can be dropped onto a line already priced.
    */
@@ -250,7 +250,7 @@ export function QuotationDialog({
     if (t.imageUrl) form.setValue(`items.${i}.imageUrl`, t.imageUrl, opts);
   }
 
-  /** Pull the last billing/shipping block used for this customer (point 6). */
+  /** Pull the last billing/shipping block used for this customer. */
   async function autoFetchCustomer() {
     const mobile = form.getValues("customerMobile");
     const name = form.getValues("customerName");
@@ -350,7 +350,7 @@ export function QuotationDialog({
 
   const docType = form.watch("docType");
   const shipToSameAsBilling = form.watch("shipToSameAsBilling");
-  // Point 4 — a Terms & Conditions preset, the counterpart to the catalog
+  // A Terms & Conditions preset, the counterpart to the catalog
   // picker on the description.
   const { data: termsTemplates } = useTemplates(
     { kind: "terms", activeOnly: true, limit: 50 },

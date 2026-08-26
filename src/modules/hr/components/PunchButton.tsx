@@ -5,7 +5,7 @@ import { PunchDialog } from "./PunchDialog";
 import { cn } from "@/lib/utils";
 
 /**
- * The attendance control, in the top bar (SRS 3.1).
+ * The attendance control, in the top bar.
  *
  * Lives in the shell, not on a page: it is the first and last thing someone
  * touches each day, and burying it behind navigation guarantees forgotten

@@ -18,8 +18,7 @@ import { Fab } from "@/shared/components/Fab";
 import { RecordCard, CardAction } from "@/shared/components/RecordCard";
 
 /**
- * The branch / godown master list behind the Location dropdowns
- * (change request 11 Aug, point 9).
+ * The branch / godown master list behind the Location dropdowns.
  */
 
 const inputCls =

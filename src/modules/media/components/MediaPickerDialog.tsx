@@ -7,7 +7,7 @@ import { toast } from "@/shared/lib/toast";
 import type { Media, MediaKind } from "../types";
 
 /**
- * The "Attach Files" picker from Change Request point 17 — a category rail on
+ * The "Attach Files" picker — a category rail on
  * the left, kind tabs across the top, a thumbnail grid, and upload-from-computer.
  *
  * Used anywhere the CRM needs to attach an existing file: product images today,

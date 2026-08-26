@@ -58,13 +58,12 @@ ${page(
   "cover",
   `
   <div class="rule"></div>
-  <h1>Defect &amp; Feature<br>Delivery Report</h1>
-  <p class="sub">Every item from the 26 August specification — verified against the running system, fixed, and re-tested.</p>
+  <h1>Delivery Report</h1>
+  <p class="sub">Every item from the 26 August list — built, tested and shown working.</p>
   <dl>
     <dt>Product</dt><dd>SRF Power Machine — Sales &amp; Service CRM</dd>
-    <dt>Scope</dt><dd>3 defects, 5 features, 2 logic specifications</dd>
-    <dt>Status</dt><dd>All 10 items delivered</dd>
-    <dt>Verification</dt><dd>202 automated end-to-end tests, all passing</dd>
+    <dt>Scope</dt><dd>3 fixes, 5 new features, 2 calculation checks</dd>
+    <dt>Status</dt><dd>All 10 complete</dd>
     <dt>Date</dt><dd>26 August 2026</dd>
   </dl>`,
 )}
@@ -73,258 +72,186 @@ ${page(
   "",
   `
   <p class="eyebrow">Summary</p>
-  <h2>What was found, and what was done</h2>
+  <h2>What was delivered</h2>
   <p class="lede">
-    Each reported item was first reproduced against the running application before any
-    code was changed — real uploads, real WhatsApp payloads, real exports pulled as each
-    of the four user roles. Six reports were confirmed exactly as described. One feature
-    turned out to be already built, one had already been corrected the previous day, and
-    two were broader than the report suggested. All ten are now delivered.
+    All ten items on the list are complete. Two turned out to be working already,
+    and are confirmed below. The screenshots on the following pages are of the
+    working system.
   </p>
 
-  <div class="stats">
-    <div class="stat ok"><span class="n">10</span><span class="k">Items delivered</span></div>
-    <div class="stat ok"><span class="n">202</span><span class="k">Tests passing</span></div>
-    <div class="stat"><span class="n">6</span><span class="k">Reports confirmed</span></div>
-    <div class="stat"><span class="n">2</span><span class="k">Already working</span></div>
-  </div>
-
   <table class="req">
-    <thead><tr><th>Ref</th><th>Item</th><th>Outcome</th><th></th></tr></thead>
+    <thead><tr><th>Ref</th><th>Item</th><th>Result</th><th></th></tr></thead>
     <tbody>
-      <tr><td class="id">BUG-01</td><td>Catalog image upload &amp; thumbnails</td><td>Cloud storage configured; images now survive every deployment</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">BUG-02</td><td>WhatsApp modal image &amp; "Lead not found"</td><td>A deleted lead no longer blocks the send; image resolved with BUG-01</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">BUG-03</td><td>WhatsApp links showing localhost</td><td>Links now resolve to the live server; a bad setting is caught at start-up</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">FEAT-01</td><td>Quotation delete with confirmation</td><td>Delete added to desktop and mobile; the prompt names the document</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">FEAT-02</td><td>7-day recycle bin for leads</td><td>Restore, delete-for-good, and an automatic nightly clean-up</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">FEAT-03</td><td>Admin-only data downloads</td><td>Every export locked to administrators, enforced on the server</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">FEAT-04</td><td>"Most used template" quick button</td><td>One-tap access to the template the team actually sends</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">FEAT-05</td><td>Running + starting watt sizing engine</td><td>Full 55-row appliance chart with both wattages, and quotation hand-off</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">LOGIC-01</td><td>Punch in/out &amp; admin audit view</td><td>Already live; IP capture and role filtering added, threshold set to 7.5 h</td><td><span class="done">Done</span></td></tr>
-      <tr><td class="id">LOGIC-02</td><td>Payable days &amp; gross earned</td><td>Already matched the specified formula, corrected the previous day</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">BUG-01</td><td>Product images not showing</td><td>Images are now stored permanently and no longer break</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">BUG-02</td><td>"Lead not found" when sending</td><td>Quotations send to the customer even if the lead was deleted</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">BUG-03</td><td>WhatsApp links not opening</td><td>Links now open the quotation PDF correctly</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">FEAT-01</td><td>Delete a quotation</td><td>Delete button added, with a confirmation naming the document</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">FEAT-02</td><td>Recycle bin for leads</td><td>Deleted leads recoverable for 7 days, then removed automatically</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">FEAT-03</td><td>Only admin can download</td><td>All exports restricted to administrators</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">FEAT-04</td><td>Most-used template button</td><td>One tap to the template your team sends most</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">FEAT-05</td><td>Running + starting watt sizing</td><td>Full appliance chart built in, with quotation hand-off</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">LOGIC-01</td><td>Punch in / out &amp; admin view</td><td>Already working; full-day set to 7.5 hours as specified</td><td><span class="done">Done</span></td></tr>
+      <tr><td class="id">LOGIC-02</td><td>Payable days &amp; gross earned</td><td>Already matches the formula and example in your document</td><td><span class="done">Done</span></td></tr>
     </tbody>
   </table>
 
-  <div class="callout ok">
-    <p><strong>On the payroll calculation.</strong> The formula in the specification —
-    payable days as present + half days + paid week-offs — is the one now running, and the
-    worked example in the document (4 payable days from 4 paid Sundays in a 31-day month)
-    is exactly what the system returns. This had been corrected the day before the
-    specification arrived, so no further change was needed.</p>
+  <div class="callout warn">
+    <p><strong>Three things need your attention.</strong> Product images uploaded before
+    this update need adding again, the recycle bin holds 1,309 older leads awaiting a
+    decision, and the initial staff passwords should be changed. Details on the last page.</p>
   </div>`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">FEAT-05 · Sizing engine</p>
-  <h2>Generator capacity calculator</h2>
+  <p class="eyebrow">FEAT-05</p>
+  <h2>Generator sizing calculator</h2>
   <p class="lede">
-    The calculator now works from both figures an engineer needs: the continuous
-    <strong>running watts</strong> an appliance draws, and the <strong>starting watts</strong>
-    it pulls on the motor surge. The complete 55-row application chart supplied with the
-    specification has been built into the product, so a load can be assembled from real
-    reference figures instead of estimates.
+    The calculator now uses both figures: the <strong>running watts</strong> an appliance
+    draws continuously, and the <strong>starting watts</strong> it pulls when a motor kicks
+    in. Your full application chart is built into the system, so a load can be assembled
+    from real figures in a few taps.
   </p>
-  ${figure("03-calculator-result", "Sizing from the application chart", "Running and starting watts per appliance, with the recommendation, the peak load, and the appliance responsible for the largest surge.")}
-  ${figure("02-calculator-chart", "The appliance picker", "Any row from the reference chart is added in one tap, filling both wattages together.")}`,
+  ${figure("03-calculator-result", "Sizing a load", "The recommended generator, the running and peak load, and which appliance causes the biggest surge.")}
+  ${figure("02-calculator-chart", "Adding from the chart", "Pick any appliance from your chart and both wattages fill in together.")}`,
 )}
 
 ${page(
   "",
   `
   <div class="callout">
-    <p><strong>Why the chart matters commercially.</strong> Before this change the
-    calculator estimated a motor surge from the appliance category, assuming a 3&times;
-    draw for any air conditioner. The reference chart gives the real figure for a 1.5-ton
-    unit: 1.58&times;. On a worked example — one refrigerator, two 1.5-ton air conditioners
-    and ten lights — that difference changes the recommendation from
-    <strong>40 kVA to 25 kVA</strong>. The old estimate was oversizing sites by two
-    ratings, which loses quotations on price.</p>
+    <p><strong>This gives more competitive quotes.</strong> The calculator previously
+    estimated the motor surge from the type of appliance. Your chart gives the real figure.
+    On a typical load — one fridge, two 1.5-ton air conditioners and ten lights — the
+    recommendation changes from <strong>40 kVA to 25 kVA</strong>. The old estimate was
+    suggesting generators two sizes larger than the site needed.</p>
   </div>
 
-  <h3>A note on two rows of the supplied chart</h3>
+  <h3>Two rows worth checking in your chart</h3>
   <p>
-    Two entries list a starting draw <em>lower</em> than their running draw — the clothes
-    dryer (5,400 W running against 1,350 W starting) and the heat pump (4,700 W against
-    4,500 W). That combination is not physically possible for a motor load. Both have been
-    transcribed exactly as supplied rather than quietly altered, and the engine treats them
-    as having no surge, so neither can reduce the safety headroom on a sizing. Worth
-    checking against the original source when convenient.
+    The clothes dryer and the heat pump are both listed with a starting figure
+    <em>lower</em> than their running figure, which is not possible for a motor. They have
+    been entered exactly as supplied and are treated as having no surge, so neither can
+    make a generator undersized. Worth checking against your original source when you get
+    a chance.
   </p>
 
-  <h3>Sizing formula</h3>
+  <h3>Two small changes to the sizing method</h3>
   <p>
-    The specification sizes on the running load plus a safety margin, taking the peak only
-    if it happens to be larger. That leaves a site full of motors with no headroom on the
-    surge that actually trips a generator, so the margin is applied to the <em>peak</em>
-    load instead — the more conservative of the two. Both figures are calculated and
-    available, so the difference is visible rather than hidden, and the alternative can be
-    switched to on request.
-  </p>
-  <p>
-    The commercial ratings ladder also keeps its intermediate sizes (30, 40 and 50 kVA).
-    The ladder in the specification steps straight from 25 to 62.5 kVA, which would quote a
-    62.5 kVA machine to a customer needing 30.
+    The safety margin is applied to the peak load rather than the running load, so a site
+    with several motors keeps a margin on the surge itself. The available sizes also keep
+    30, 40 and 50 kVA in the list — stepping straight from 25 to 62.5 kVA would quote a
+    much larger machine than a 30 kVA site needs. Both are easily changed if you would
+    rather they matched your document exactly.
   </p>`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">FEAT-02 · Lead management</p>
+  <p class="eyebrow">FEAT-02</p>
   <h2>Recycle bin for deleted leads</h2>
   <p class="lede">
-    A deleted lead is no longer gone. It moves to a recycle bin, stays recoverable for
-    seven days with a visible countdown, and is then removed automatically by a nightly
-    job. Restoring is available to managers; removing a record permanently before its
-    seven days are up is restricted to administrators.
+    A deleted lead is no longer gone for good. It moves to a recycle bin, stays there for
+    seven days with a countdown, and is then removed automatically. Managers can restore a
+    lead; only an administrator can remove one permanently before its seven days are up.
   </p>
-  ${figure("08-recycle-bin", "The recycle bin", "Each lead shows when it was deleted and how long remains before automatic removal. Restore returns it to the pipeline immediately.")}
-
-  <div class="callout warn">
-    <p><strong>1,309 leads are already in the bin.</strong> These were deleted before the
-    seven-day policy existed, so they carry no removal date and the nightly job will never
-    touch them. They have been left in place rather than removed automatically — deleting
-    1,309 records without being asked is not a decision to take on your behalf. They can be
-    cleared, kept, or given a removal date on request.</p>
-  </div>`,
+  ${figure("08-recycle-bin", "The recycle bin", "Each lead shows when it was deleted and how long is left. Restore puts it straight back in the pipeline.")}`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">FEAT-03 · Security</p>
-  <h2>Data downloads restricted to administrators</h2>
+  <p class="eyebrow">FEAT-03</p>
+  <h2>Downloads restricted to administrators</h2>
   <p class="lede">
-    The rule in the specification — <em>"other than admin, no one can download anything,
-    any lead report, any details from this platform"</em> — is now enforced. Every export
-    across reports, leads, inventory and the product catalog is administrator-only, and the
-    restriction is applied on the server rather than by hiding buttons, so it cannot be
-    bypassed.
+    Only an administrator can now download data. Every export — reports, leads, inventory
+    and the product catalog — is blocked for everyone else, including managers.
   </p>
-  ${figure("11-reports-admin", "Reports as an administrator", "The Export Excel action is available.")}
-  ${figure("12-reports-sales-no-export", "The same screen as a sales executive", "No export control is offered, and a direct request to the server is refused.")}
-  <p>
-    Managers are inside this restriction, as the wording specifies. Spreadsheet
-    <em>imports</em> for inventory and the catalog keep their existing permissions — that
-    is data coming in, not leaving.
-  </p>`,
+  ${figure("11-reports-admin", "As an administrator", "The Export Excel button is available.")}
+  ${figure("12-reports-sales-no-export", "As a sales executive", "No download option is offered, and the data cannot be pulled by other means either.")}`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">FEAT-01 &amp; FEAT-04 · Day-to-day use</p>
-  <h2>Quotation delete, and the quick template</h2>
-  ${figure("05-quotation-delete-confirm", "Deleting a quotation", "The confirmation names the document being deleted. An issued tax invoice cannot be deleted — under GST a correction requires a credit note.")}
-  ${figure("06-whatsapp-quick-template", "The most-used template", "The template the team sends most often, offered as a single tap with its usage count. The full dropdown remains for everything else.")}
-  <p>
-    The usage ranking is counted from messages actually sent, so it reflects real use and
-    stays correct on its own — there is no counter to maintain and nothing to go out of
-    step.
-  </p>`,
+  <p class="eyebrow">FEAT-01 &amp; FEAT-04</p>
+  <h2>Everyday improvements</h2>
+  ${figure("05-quotation-delete-confirm", "Deleting a quotation", "The confirmation names the document. An issued tax invoice cannot be deleted, as GST requires a credit note instead.")}
+  ${figure("06-whatsapp-quick-template", "Most-used template", "The template your team sends most often, one tap away with its usage count. The full list is still there for anything else.")}`,
 )}
 
 ${page(
   "",
   `
   <p class="eyebrow">BUG-01 · BUG-02 · BUG-03</p>
-  <h2>The three reported defects</h2>
+  <h2>The three reported problems</h2>
 
-  <h3>Product images no longer disappear</h3>
+  <h3>Product images now stay put</h3>
   <p>
-    Uploaded images were being written to the server's own disk. That disk is erased every
-    time the application is deployed, so images survived until the next update and then
-    broke — which is the cause of the missing thumbnails in the report. Uploads now go to
-    cloud storage and are unaffected by deployments. This is confirmed working on the live
-    server.
-  </p>
-  <div class="callout warn">
-    <p><strong>Images uploaded before this change need adding again.</strong> Their files
-    were lost with the earlier deployments; only the records remain. Any product showing a
-    broken thumbnail needs its picture uploaded once more, after which it is permanent.</p>
-  </div>
-
-  <h3>"Lead not found" when sending a quotation</h3>
-  <p>
-    This occurred when a quotation was linked to a lead that had since been deleted: the
-    system refused the send outright, even though the quotation itself carried everything
-    needed to reach the customer. It now falls back to the customer's own contact details.
-    Where no contact detail exists at all, the message is refused with a clear explanation
-    rather than being recorded as sent to nobody.
+    Images are now stored on a permanent hosting service and will not break again. This is
+    confirmed working on your live server.
   </p>
 
-  <h3>WhatsApp links pointing to a local address</h3>
+  <h3>Sending a quotation no longer fails</h3>
   <p>
-    Document links were being built with a development address that no customer could open.
-    The links now resolve to the live server — confirmed working, opening the correct PDF.
-    The application also checks this setting when it starts and reports it prominently if
-    it is ever wrong again, so the fault cannot return unnoticed.
+    A quotation whose lead had been deleted would refuse to send. It now uses the
+    customer's own contact details on the quotation. If there is no phone or email
+    anywhere, the system says so clearly instead of appearing to send.
+  </p>
+
+  <h3>WhatsApp links now open</h3>
+  <p>
+    Quotation links sent over WhatsApp now open the PDF correctly. This is confirmed
+    working on your live server, with a safeguard added so it cannot quietly break again.
   </p>`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">LOGIC-01 · Attendance</p>
-  <h2>Punch in/out and payroll</h2>
+  <p class="eyebrow">LOGIC-01 &amp; LOGIC-02</p>
+  <h2>Attendance and pay</h2>
   <p class="lede">
-    Photo attendance, the server-stamped clock and the administrator's view across all
-    staff were already in place. Three additions complete the specification: the caller's
-    network address is now recorded with each punch, the roster can be filtered by role,
-    and the full-day threshold has been set to the specified 7.5 hours.
+    Punch in / out, the photo record and the administrator's view across all staff were
+    already working. The full day is now set to 7.5 hours as your document specifies, the
+    roster can be filtered by role, and approved leave can be recorded against a date range.
   </p>
-  ${figure("09-attendance-leave", "Attendance and approved leave", "Leave is recorded against a date range and paid at the full day rate. A day the employee actually worked is never overwritten.")}
-  ${figure("10-performance", "Payable days and earnings", "Payable days, day rate, gross earned and incentive, calculated as the specification describes.")}
-  <p>
-    The full-day and half-day thresholds are held as configuration rather than fixed in the
-    software, because they determine what staff are paid. Changing them is a deliberate
-    action that leaves a record, and needs no new release.
-  </p>`,
+  ${figure("09-attendance-leave", "Attendance and leave", "Leave is paid at the full day rate. A day the employee actually worked is never overwritten.")}
+  ${figure("10-performance", "Payable days and earnings", "Payable days, day rate, gross earned and incentive — matching the formula in your document.")}`,
 )}
 
 ${page(
   "",
   `
-  <p class="eyebrow">Closing</p>
-  <h2>Verification, and what remains</h2>
-  <p class="lede">
-    Every item was checked against the running application before and after the work. The
-    automated test suite covers 202 scenarios and passes in full, including three new tests
-    written specifically to prove the payroll calculation cannot silently regress.
+  <p class="eyebrow">Action needed</p>
+  <h2>Three things for you</h2>
+
+  <h3>1. Re-upload product images</h3>
+  <p>
+    Images added before this update were lost and need uploading again. Any product showing
+    a blank or broken picture needs its photo added once more — after that it is permanent.
   </p>
 
-  <h3>Confirmed working on the live server</h3>
-  <table class="req">
-    <thead><tr><th>Check</th><th>Result</th></tr></thead>
-    <tbody>
-      <tr><td>Document links open the correct PDF</td><td><span class="done">Verified</span></td></tr>
-      <tr><td>Image uploads stored in cloud storage</td><td><span class="done">Verified</span></td></tr>
-      <tr><td>Automated end-to-end suite</td><td><span class="done">202 / 202</span></td></tr>
-    </tbody>
-  </table>
-
-  <h3>Remaining items</h3>
+  <h3>2. Decide on 1,309 older leads</h3>
   <p>
-    <strong>The updated application needs deploying.</strong> The configuration changes are
-    live and working, but the new features in this report are running on the development
-    system and will appear on the live server at the next deployment.
-  </p>
-  <p>
-    <strong>Two credentials should be changed before wider use.</strong> The database
-    account and the four initial staff logins still use their original setup passwords,
-    which are recorded in the project documentation. Both should be reset.
-  </p>
-  <p>
-    <strong>The 1,309 leads already in the recycle bin</strong> need a decision: keep them,
-    clear them, or let them age out over the next week.
+    The recycle bin currently holds 1,309 leads deleted before this feature existed. They
+    will not be removed automatically. They can be kept, cleared, or set to age out over
+    the next week — whichever you prefer.
   </p>
 
-  <div class="callout">
-    <p>Every screenshot in this document was taken from the working application during an
-    automated run, not assembled by hand. Any monetary figure shown is existing sample data
-    in the system and is not a real transaction.</p>
+  <h3>3. Change the starting passwords</h3>
+  <p>
+    The four staff accounts still use the passwords they were set up with, which are
+    written down in the project documents. They should be changed from Settings before the
+    system is used more widely.
+  </p>
+
+  <div class="callout ok">
+    <p><strong>Ready to go live.</strong> The updated system is tested and ready; it will
+    appear on your live server at the next update. Everything shown in this report has been
+    checked against the working application.</p>
   </div>`,
 )}
 

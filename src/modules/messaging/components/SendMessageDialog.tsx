@@ -136,6 +136,22 @@ export function SendMessageDialog({
       toast.error("Pick a template or write a message");
       return;
     }
+    /*
+      Open the tab NOW, before the network call.
+
+      Safari on iOS only allows a new window from inside the synchronous part of
+      a user gesture. Sending is a round-trip to the server, so by the time the
+      handoff URL comes back the gesture is over and Safari silently blocks the
+      popup — WhatsApp never opens. Android's browser is permissive and allows
+      it, which is why this worked there and failed on iPhone.
+
+      So the window is claimed while the tap is still on the stack and pointed at
+      the URL once it arrives. `noopener` is deliberately not set here: it makes
+      `window.open` return null, and we need the handle to navigate it.
+    */
+    const willHandOff = !cap?.configured;
+    const handoff = willHandOff ? window.open("", "_blank") : null;
+
     try {
       const message = await sendMutation.mutateAsync({
         leadId,
@@ -151,15 +167,23 @@ export function SendMessageDialog({
       });
 
       if (message.handoffUrl) {
-        // Hand off to the user's own WhatsApp / mail client.
-        window.open(message.handoffUrl, "_blank", "noopener,noreferrer");
-        toast.success("Message prepared — finish sending in the window that opened");
+        if (handoff && !handoff.closed) {
+          handoff.location.href = message.handoffUrl;
+        } else {
+          // The popup was blocked even so, or we did not expect a handoff.
+          // Navigating this tab still reaches WhatsApp; the browser comes back
+          // when the user returns from the app.
+          window.location.href = message.handoffUrl;
+        }
+        toast.success("Message prepared — finish sending in WhatsApp");
       } else {
+        handoff?.close();
         toast.success(isWhatsApp ? "WhatsApp message sent" : "Email sent");
       }
       onOpenChange(false);
       onSent?.();
     } catch (err) {
+      handoff?.close();
       toast.error(getApiErrorMessage(err));
     }
   }

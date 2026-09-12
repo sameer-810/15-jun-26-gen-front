@@ -109,6 +109,7 @@ function toQty(v: string): number | undefined {
 /** Map a lead onto the seed values for a new quotation raised from its row. */
 function leadToQuotationPrefill(lead: Lead): QuotationPrefill {
   return {
+    lead: lead.id,
     customerName: lead.customerName,
     customerMobile: lead.mobile,
     customerEmail: lead.email,

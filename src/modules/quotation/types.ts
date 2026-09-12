@@ -124,6 +124,13 @@ export type QuotationItemPayload = {
  * than a Lead, so the quotation module stays independent of the lead module.
  */
 export type QuotationPrefill = {
+  /**
+   * The lead this document is being raised for, carried through so the created
+   * document is linked back to it. Without this the document is an orphan: it
+   * never appears in the lead's Documents tab, and the WhatsApp composer cannot
+   * offer it to attach, because both look documents up by lead.
+   */
+  lead?: string;
   customerName: string;
   customerMobile?: string;
   customerEmail?: string;
@@ -138,6 +145,8 @@ export type QuotationPrefill = {
 
 export type QuotationCreatePayload = {
   docType: DocType;
+  /** Set when the document is raised from a lead, so it belongs to that lead. */
+  lead?: string;
   date?: string;
   validUntil?: string;
   customerName: string;

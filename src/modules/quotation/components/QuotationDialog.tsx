@@ -296,6 +296,9 @@ export function QuotationDialog({
         .filter(Boolean);
       const payload = {
         docType: data.docType,
+        // Only when raising from a lead. Left out when editing, so an existing
+        // document keeps whatever lead it already belongs to.
+        ...(mode === "create" && prefill?.lead ? { lead: prefill.lead } : {}),
         date: data.date || undefined,
         validUntil: data.validUntil || undefined,
         customerName: data.customerName,

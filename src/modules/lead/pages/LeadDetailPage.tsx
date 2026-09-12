@@ -123,6 +123,7 @@ export function LeadDetailPage() {
   const { lead, engagement, timeline, reminders, quotations, sales } = data;
 
   const quotePrefill: QuotationPrefill = {
+    lead: lead.id,
     customerName: lead.customerName,
     customerMobile: lead.mobile,
     customerEmail: lead.email,

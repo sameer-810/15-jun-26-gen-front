@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { RUN_TAG, adminApi, createLead, deleteLeads, uiLogin, waitForTable } from "./helpers";
+import { API, RUN_TAG, adminApi, createLead, deleteLeads, uiLogin, waitForTable } from "./helpers";
 
 /**
  * Change Request Phase 1 — browser behaviour in Chromium.
@@ -255,6 +255,37 @@ test.describe("Point 1 — raise a quotation from a lead row", () => {
 
     await dialog.getByRole("button", { name: "Cancel" }).click();
     await expect(dialog).toBeHidden();
+  });
+
+  /**
+   * The document raised this way must belong to the lead, not just carry its
+   * details. Both the lead's Documents tab and the WhatsApp composer's attach
+   * picker look documents up by lead, so an unlinked one is invisible in the
+   * places it is actually needed — while still looking correct on screen.
+   */
+  test("a document raised from a lead belongs to that lead", async ({ page }) => {
+    const lead = await createLead(ctx, { customerName: `${RUN_TAG} quotelink`, quantity: 1 });
+    created.push(lead.id);
+
+    await page.goto(`/leads/${lead.id}`);
+    await page.getByRole("button", { name: "Quote" }).click();
+
+    const dialog = page.locator("div.fixed.inset-0").filter({ hasText: "New Document" });
+    await expect(dialog).toBeVisible();
+    await dialog.getByPlaceholder("Rate").first().fill("50000");
+    await dialog.getByRole("button", { name: "Create" }).click();
+    await expect(dialog).toBeHidden();
+
+    const res = await ctx.get(`${API}/quotations?lead=${lead.id}`);
+    expect(res.status(), await res.text()).toBe(200);
+    const docs = (await res.json()).data;
+    expect(docs, "the document was created without a lead").toHaveLength(1);
+
+    // And so the composer can offer it to attach.
+    await page.getByRole("button", { name: "WhatsApp" }).click();
+    const picker = page.getByTestId("send-document-picker");
+    await expect(picker).toBeVisible();
+    await expect(picker.locator("option")).toContainText([/No document/, /QTN-/]);
   });
 });
 

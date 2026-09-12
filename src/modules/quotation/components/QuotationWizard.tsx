@@ -156,6 +156,8 @@ export function QuotationWizard({ open, onOpenChange, docType, prefill, onSucces
       // underlying api.create does return the created document.
       const created = (await createMutation.mutateAsync({
         docType,
+        // Keeps the document attached to the lead it was raised from.
+        ...(prefill?.lead ? { lead: prefill.lead } : {}),
         customerName: customer.customerName.trim(),
         customerMobile: customer.customerMobile || undefined,
         customerEmail: customer.customerEmail || undefined,

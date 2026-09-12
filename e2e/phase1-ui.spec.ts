@@ -59,8 +59,10 @@ test.describe("Leads list", () => {
     await waitForTable(page);
 
     const row = page.locator("tbody tr", { hasText: `${RUN_TAG} clock` }).first();
-    // formatDateTime → "08 Aug 2026, 05:12 pm"
-    await expect(row).toContainText(/\d{2}\s\w{3}\s\d{4},\s*\d{1,2}:\d{2}/);
+    // formatDateTime → "08 Aug 2026, 05:12 pm". The month abbreviation is not
+    // always three letters — Intl gives "Sept" — so allow a range, or this test
+    // passes for eleven months of the year and fails through September.
+    await expect(row).toContainText(/\d{2}\s\w{3,5}\s\d{4},\s*\d{1,2}:\d{2}/);
   });
 
   test("point 7: the status filter offers the new vocabulary and not In Progress", async ({

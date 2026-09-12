@@ -46,6 +46,8 @@ export type BusinessProfile = {
   letterheadHeaderUrl?: string;
   letterheadFooterUrl?: string;
   signatureUrl?: string;
+  /** Shown on the chat card when a shared document has no product photo. */
+  shareImageUrl?: string;
   closingLines?: string[];
 };
 

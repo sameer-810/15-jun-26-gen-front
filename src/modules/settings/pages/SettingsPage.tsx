@@ -122,11 +122,12 @@ function SeriesRow({
   );
 }
 
-type ArtKey = "letterheadHeaderUrl" | "letterheadFooterUrl" | "signatureUrl";
+type ArtKey = "letterheadHeaderUrl" | "letterheadFooterUrl" | "signatureUrl" | "shareImageUrl";
 
 export function SettingsPage() {
   const { data, isLoading } = useBusinessProfile();
   const [art, setArt] = useState<Record<ArtKey, string>>({
+    shareImageUrl: "",
     letterheadHeaderUrl: "",
     letterheadFooterUrl: "",
     signatureUrl: "",
@@ -166,6 +167,7 @@ export function SettingsPage() {
       });
       // Letterhead artwork is picked, not typed, so it lives outside the form.
       setArt({
+        shareImageUrl: data.shareImageUrl ?? "",
         letterheadHeaderUrl: data.letterheadHeaderUrl ?? "",
         letterheadFooterUrl: data.letterheadFooterUrl ?? "",
         signatureUrl: data.signatureUrl ?? "",
@@ -466,7 +468,9 @@ export function SettingsPage() {
             </h2>
             <p className="text-xs text-muted-foreground">
               Used on quotations, proforma invoices and tax invoices. Leave blank to keep the
-              typeset header.
+              typeset header. The <strong>WhatsApp preview picture</strong> is shown on the chat
+              card when a document link is shared and the quotation has no product photo of its own
+              — a genset photo or your logo works well.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -475,6 +479,7 @@ export function SettingsPage() {
                 ["letterheadHeaderUrl", "Header artwork", "header"],
                 ["letterheadFooterUrl", "Footer artwork", "footer"],
                 ["signatureUrl", "Signature / stamp", "signature"],
+                ["shareImageUrl", "WhatsApp preview picture", "share"],
               ] as const
             ).map(([key, label, testId]) => (
               <Field key={key} label={label}>

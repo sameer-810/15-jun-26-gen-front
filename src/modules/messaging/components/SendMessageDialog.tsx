@@ -92,6 +92,23 @@ export function SendMessageDialog({
   const cap = channel === "whatsapp" ? caps?.whatsapp : caps?.email;
   const isWhatsApp = channel === "whatsapp";
 
+  /*
+    What the customer will actually see of the template's picture. Without the
+    Business API a WhatsApp message is a link that carries text only, so the
+    picture reaches the chat as a link preview card instead, and WhatsApp
+    previews one link per message, so an attached document's card takes its
+    place. An upload from before online storage lives on localhost, where
+    WhatsApp cannot fetch it.
+  */
+  const pictureIsOnline = Boolean(templateImageUrl?.startsWith("https://"));
+  const pictureNote = cap?.configured
+    ? "This picture is sent ahead of the message."
+    : !pictureIsOnline
+      ? "Customers can't see this picture: it was uploaded before online storage was set up. Re-upload it in Templates."
+      : attachedId
+        ? "With a document attached, WhatsApp shows the document's card instead of this picture."
+        : "Your customer sees this picture as a preview card above the message.";
+
   useEffect(() => {
     if (!open) return;
     setRecipient(to ?? "");
@@ -328,7 +345,9 @@ export function SendMessageDialog({
           </p>
         </div>
 
-        {templateImageUrl && (
+        {/* WhatsApp only. The email sender has no way to carry the picture, and
+            promising it there was worse than saying nothing. */}
+        {templateImageUrl && isWhatsApp && (
           <div className="flex items-center gap-2 rounded-lg border border-border p-2.5 text-sm">
             <img
               src={templateImageUrl}
@@ -336,10 +355,8 @@ export function SendMessageDialog({
               data-testid="template-image-preview"
               className="h-12 w-12 shrink-0 rounded border border-border object-cover"
             />
-            <span className="text-xs text-muted-foreground">
-              {isWhatsApp
-                ? "This picture is sent ahead of the message."
-                : "This picture is included with the email."}
+            <span className="text-xs text-muted-foreground" data-testid="template-image-note">
+              {pictureNote}
             </span>
           </div>
         )}

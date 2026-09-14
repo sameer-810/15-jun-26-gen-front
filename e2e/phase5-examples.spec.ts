@@ -118,6 +118,15 @@ test.describe("Examples 1 & 2 — a WhatsApp template with an image", () => {
     await page.getByTestId("detail-whatsapp").click();
     await page.locator("#send-template").selectOption(tpl.id);
     await expect(page.getByTestId("template-image-preview")).toBeVisible();
+
+    // The note must describe what the customer really gets. Without the Business
+    // API the picture arrives as a preview card, not as an image sent ahead.
+    const caps = await (await ctx.get(`${API}/messages/capabilities`)).json();
+    await expect(page.getByTestId("template-image-note")).toHaveText(
+      caps.data.whatsapp.configured
+        ? "This picture is sent ahead of the message."
+        : "Your customer sees this picture as a preview card above the message.",
+    );
   });
 
   test("a template can be renamed and its wording rewritten", async ({ page }) => {

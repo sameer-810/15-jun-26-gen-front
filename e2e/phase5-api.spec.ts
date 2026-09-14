@@ -250,17 +250,26 @@ test.describe("Points 1 & 2 — sending, and getting the PDF to the customer", (
     const link = (await (await ctx.get(`${API}/messages/document-link/${doc.id}`)).json()).data;
     expect(link.url).toContain("/d/");
 
-    // A brand-new context proves no session is involved.
-    const anon = await ctx.get(link.url, { headers: { Authorization: "" } });
-    expect(anon.ok(), "the public link should open without auth").toBeTruthy();
+    // The link names the deployed server (PUBLIC_BASE_URL). Point it at the one
+    // under test: followed as-is, this was checking production, not this build.
+    const url = link.url.replace(/^https?:\/\/[^/]+/, API.replace(/\/api$/, ""));
+
+    // A brand-new context proves no session is involved. The link itself is the
+    // page WhatsApp builds its preview card from; the PDF is one tap behind it.
+    const landing = await ctx.get(url, { headers: { Authorization: "" } });
+    expect(landing.ok(), "the public link should open without auth").toBeTruthy();
+    expect(landing.headers()["content-type"]).toContain("text/html");
+
+    const anon = await ctx.get(`${url}/pdf`, { headers: { Authorization: "" } });
+    expect(anon.ok(), "the PDF should open without auth").toBeTruthy();
     expect(anon.headers()["content-type"]).toContain("application/pdf");
     expect((await anon.body()).subarray(0, 5).toString()).toBe("%PDF-");
     // Not cached or indexed — it is a private customer document.
     expect(anon.headers()["cache-control"]).toContain("no-store");
 
     // A tampered signature is refused rather than served.
-    expect((await ctx.get(`${link.url}x`)).status()).toBe(403);
-    expect((await ctx.get(`${link.url.split("/d/")[0]}/d/not-a-token`)).status()).toBe(403);
+    expect((await ctx.get(`${url}x`)).status()).toBe(403);
+    expect((await ctx.get(`${url.split("/d/")[0]}/d/not-a-token`)).status()).toBe(403);
   });
 
   test("sending renders the template and carries the document link", async () => {

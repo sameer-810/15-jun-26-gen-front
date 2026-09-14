@@ -235,3 +235,148 @@ test.describe("the page the customer lands on", () => {
     expect(cell).toContain("…");
   });
 });
+
+/**
+ * A template's picture, sent without a document.
+ *
+ * Without the WhatsApp Business API a message leaves through a `wa.me` link,
+ * which carries text and nothing else, so the picture a salesperson saw in the
+ * composer never reached the customer. The message now ends with a link whose
+ * page names the picture as og:image, and WhatsApp draws it as the preview card.
+ */
+
+// A 1x1 PNG is enough: the assertions are about the link, the tags, and that
+// Cloudinary really serves what the tags name.
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+
+test.describe("a template's picture, with no document attached", () => {
+  let apiConnected = false;
+  let pictureTemplateId = "";
+  let plainTemplateId = "";
+
+  test.beforeAll(async () => {
+    const caps = await (await ctx.get(`${API}/messages/capabilities`)).json();
+    apiConnected = Boolean(caps.data?.whatsapp?.configured);
+
+    const up = await ctx.post(`${API}/media`, {
+      multipart: { file: { name: `${RUN_TAG}-card.png`, mimeType: "image/png", buffer: PNG } },
+    });
+    expect(up.status(), await up.text()).toBe(201);
+    const media = (await up.json()).data;
+    cleanup.push({ path: "media", id: media.id });
+
+    const withPicture = await ctx.post(`${API}/templates`, {
+      data: {
+        kind: "whatsapp",
+        name: `${RUN_TAG} Picture card`,
+        // Laid out like the real templates: no line breaks, only runs of spaces
+        // pushing each ✓ point onto its own line inside a chat bubble.
+        body: "✓*Bajaj 3900PS* generator                              ✓Two years warranty",
+        imageId: media.id,
+      },
+    });
+    expect(withPicture.status(), await withPicture.text()).toBe(201);
+    const tpl = (await withPicture.json()).data;
+    cleanup.push({ path: "templates", id: tpl.id });
+    expect(tpl.imageUrl, "the picture must be online for WhatsApp to fetch it").toMatch(/^https:/);
+    pictureTemplateId = tpl.id;
+
+    const plain = await ctx.post(`${API}/templates`, {
+      data: { kind: "whatsapp", name: `${RUN_TAG} No picture`, body: "Plain text only" },
+    });
+    expect(plain.status(), await plain.text()).toBe(201);
+    plainTemplateId = (await plain.json()).data.id;
+    cleanup.push({ path: "templates", id: plainTemplateId });
+  });
+
+  test.beforeEach(() => {
+    // With the Business API connected the picture goes as a real image instead.
+    test.skip(apiConnected, "WhatsApp Business API is connected; no link is used");
+  });
+
+  /** Send, then read back the text the salesperson's WhatsApp opens with. */
+  async function send(data: Record<string, unknown>) {
+    const res = await ctx.post(`${API}/messages`, {
+      data: { channel: "whatsapp", to: "9900112233", ...data },
+    });
+    expect(res.status(), await res.text()).toBe(201);
+    const msg = (await res.json()).data;
+    const text = new URL(msg.handoffUrl).searchParams.get("text") ?? "";
+    return { msg, links: text.match(/https?:\/\/\S+/g) ?? [] };
+  }
+
+  /** The link, pointed at the server under test rather than the deployed one. */
+  const local = (url: string) => url.replace(/^https?:\/\/[^/]+/, ORIGIN);
+
+  test("reaches the customer as a preview card", async ({ request }) => {
+    const { msg, links } = await send({ templateId: pictureTemplateId });
+
+    expect(links, "exactly one link, so WhatsApp previews the right one").toHaveLength(1);
+    expect(links[0]).toContain("/p/");
+    expect(msg.previewUrl).toBe(links[0]);
+
+    const res = await request.get(local(links[0]), { headers: { "User-Agent": CRAWLER_UA } });
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-type"]).toContain("text/html");
+    const html = await res.text();
+
+    const image = metaTag(html, "og:image");
+    expect(image).toContain("c_pad,b_white,w_1200,h_630");
+    // WhatsApp's *bold* markers are stripped from the card's text.
+    expect(metaTag(html, "og:description")).toBe("Bajaj 3900PS generator");
+    expect(metaTag(html, "twitter:card")).toBe("summary_large_image");
+
+    const img = await request.get(image!);
+    expect(img.status()).toBe(200);
+    expect(img.headers()["content-type"]).toContain("image");
+  });
+
+  test("gives way to an attached document, which has a card of its own", async () => {
+    const doc = await quotationWithImage();
+    const { msg, links } = await send({ templateId: pictureTemplateId, documentId: doc.id });
+
+    expect(links).toHaveLength(1);
+    expect(links[0]).toContain("/d/");
+    expect(msg.previewUrl).toBeFalsy();
+  });
+
+  test("adds no link when the template has no picture", async () => {
+    const { msg, links } = await send({ templateId: plainTemplateId });
+    expect(links).toHaveLength(0);
+    expect(msg.previewUrl).toBeFalsy();
+  });
+
+  test("cannot be swapped with a document link", async ({ request }) => {
+    const { links } = await send({ templateId: pictureTemplateId });
+    const previewToken = links[0].split("/p/")[1];
+    const doc = await quotationWithImage();
+    const documentToken = (await shareLink(doc.id)).split("/d/")[1];
+
+    expect((await request.get(`${ORIGIN}/d/${previewToken}`)).status()).toBe(403);
+    expect((await request.get(`${ORIGIN}/p/${documentToken}`)).status()).toBe(403);
+  });
+
+  test("shows the picture and the message on a phone", async ({ page }) => {
+    const { links } = await send({ templateId: pictureTemplateId });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(local(links[0]));
+
+    const hero = page.locator("img.hero");
+    await expect(hero).toBeVisible();
+    expect(await hero.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+    // Each ✓ point on its own line, although the template has no line breaks.
+    const lines = (await page.locator(".message").innerText())
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    expect(lines).toEqual(["✓Bajaj 3900PS generator", "✓Two years warranty"]);
+
+    const overflows = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(overflows, "the page scrolls sideways on a phone").toBe(false);
+  });
+});

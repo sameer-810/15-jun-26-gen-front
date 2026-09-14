@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Pencil,
@@ -82,7 +82,7 @@ function SheetAction({
   label: string;
   onClick: () => void;
   disabled?: boolean;
-  tone?: "neutral" | "primary";
+  tone?: "neutral" | "primary" | "destructive";
 }) {
   return (
     <button
@@ -91,7 +91,11 @@ function SheetAction({
       disabled={disabled}
       className={cn(
         "pg-tap flex w-full items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors disabled:opacity-40",
-        tone === "primary" ? "text-primary hover:bg-primary/10" : "text-foreground hover:bg-accent",
+        tone === "primary"
+          ? "text-primary hover:bg-primary/10"
+          : tone === "destructive"
+            ? "text-destructive hover:bg-destructive/10"
+            : "text-foreground hover:bg-accent",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -125,6 +129,8 @@ function leadToQuotationPrefill(lead: Lead): QuotationPrefill {
 export function LeadListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canDelete = role === "admin";
+  // Set when a card's More sheet opens — see the sheet's Delete item.
+  const requestDeleteRef = useRef<((id: string) => void) | null>(null);
   // Distributing leads across the team is a sales-manager job, so managers get
   // it too. Matches the guard on POST /leads/bulk-assign.
   const canAssign = role === "admin" || role === "manager";
@@ -288,7 +294,9 @@ export function LeadListPage() {
         // keyboard users and "open in new tab" are unaffected.
         rowHref={(l) => `/leads/${l.id}`}
         emptyText="No leads found. Create your first lead."
-        deleteConfirmText="Delete this lead? This removes it from the pipeline (history is retained)."
+        deleteConfirmText={(l) =>
+          `Delete ${l.customerName}? It moves to the Recycle Bin, where an admin or manager can restore it.`
+        }
         columns={[
           {
             // Date and time in the first row. For an imported lead the
@@ -663,7 +671,7 @@ export function LeadListPage() {
             </div>
           </div>
         )}
-        renderActions={(lead, onEdit) => (
+        renderActions={(lead, onEdit, onRequestDelete) => (
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => onEdit(lead)}
@@ -756,6 +764,25 @@ export function LeadListPage() {
                 <CheckCircle2 className="h-3 w-3" /> Convert
               </button>
             )}
+            {/*
+              Single-lead delete. The table has always passed this handler in;
+              this custom row ignored it, so the button never appeared on screen
+              while the code and plan both assumed it did. Any status, unlike
+              bulk delete: one deliberate click plus a confirm is not the
+              mis-click risk a whole selection is, and the lead is recoverable
+              from the Recycle Bin.
+            */}
+            {canDelete && (
+              <button
+                onClick={() => onRequestDelete(lead.id)}
+                data-testid={`delete-${lead.id}`}
+                aria-label="Delete lead"
+                title="Delete lead"
+                className="flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            )}
           </div>
         )}
         /*
@@ -773,7 +800,7 @@ export function LeadListPage() {
           edit, quote, follow-ups, timeline, convert — is one tap away under
           "More", which keeps the card to one decision.
         */
-        renderMobileCard={(lead) => (
+        renderMobileCard={(lead, { onRequestDelete }) => (
           <RecordCard
             to={`/leads/${lead.id}`}
             disc={initialsOf(lead.customerName)}
@@ -839,6 +866,9 @@ export function LeadListPage() {
                   aria-label="More actions"
                   onClick={(e) => {
                     e.stopPropagation();
+                    // The sheet lives outside the table, so it borrows the
+                    // table's delete handler for as long as it is open.
+                    requestDeleteRef.current = onRequestDelete;
                     setMoreFor(lead);
                   }}
                   className="pg-tap flex shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent"
@@ -931,6 +961,18 @@ export function LeadListPage() {
                   setConvertLead(moreFor);
                   setConvertOpen(true);
                   setMoreFor(null);
+                }}
+              />
+            )}
+            {canDelete && (
+              <SheetAction
+                icon={Trash2}
+                label="Delete lead"
+                tone="destructive"
+                onClick={() => {
+                  const id = moreFor.id;
+                  setMoreFor(null);
+                  requestDeleteRef.current?.(id);
                 }}
               />
             )}

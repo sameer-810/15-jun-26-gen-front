@@ -227,6 +227,66 @@ test.describe("Point 9 — admin bulk delete in the browser", () => {
   });
 });
 
+/**
+ * Deleting one lead from its own row.
+ *
+ * The delete handler was wired from the first commit and the change-request
+ * plan relied on it existing, but the Leads row never rendered a button, so an
+ * admin had no way to delete a single live lead. No test looked at the screen
+ * for it. These do, on both layouts.
+ */
+test.describe("Deleting one lead from its row", () => {
+  /** Remove for good, so a passing run leaves nothing in the Recycle Bin. */
+  async function purge(id: string) {
+    await ctx.delete(`${API}/leads/${id}/permanent`).catch(() => undefined);
+  }
+
+  async function inRecycleBin(id: string, name: string) {
+    const res = await ctx.get(`${API}/leads/trash`, { params: { search: name } });
+    expect(res.status(), await res.text()).toBe(200);
+    return ((await res.json()).data as { id: string }[]).some((l) => l.id === id);
+  }
+
+  test("an admin can delete a live lead, and it lands in the Recycle Bin", async ({ page }) => {
+    const name = `${RUN_TAG} rowdelete`;
+    const lead = await createLead(ctx, { customerName: name, status: "contacted" });
+
+    await page.goto("/leads");
+    await page.getByPlaceholder("Customer, mobile, city, requirement...").fill(name);
+    await waitForTable(page);
+
+    const button = page.getByTestId(`delete-${lead.id}`);
+    await expect(button, "no delete button on the lead's row").toBeVisible();
+    await button.click();
+
+    // The prompt names the lead, so the wrong row is caught before it goes.
+    await expect(page.getByText(`Delete ${name}?`)).toBeVisible();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+    await expect(page.locator("tbody tr", { hasText: name })).toHaveCount(0);
+    expect(await inRecycleBin(lead.id, name)).toBe(true);
+    await purge(lead.id);
+  });
+
+  test("on a phone, Delete is in the card's More sheet", async ({ page }) => {
+    const name = `${RUN_TAG} phonedelete`;
+    const lead = await createLead(ctx, { customerName: name, status: "new" });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/leads");
+    await page.getByPlaceholder("Customer, mobile, city, requirement...").fill(name);
+
+    await page.getByRole("button", { name: "More actions" }).first().click();
+    await page.getByRole("button", { name: "Delete lead" }).click();
+    await expect(page.getByText(`Delete ${name}?`)).toBeVisible();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+    await expect(page.getByText(name)).toHaveCount(0);
+    expect(await inRecycleBin(lead.id, name)).toBe(true);
+    await purge(lead.id);
+  });
+});
+
 test.describe("Point 1 — raise a quotation from a lead row", () => {
   test("the Quote button opens a pre-filled quotation dialog", async ({ page }) => {
     const lead = await createLead(ctx, { customerName: `${RUN_TAG} quoteme`, quantity: 2 });
@@ -286,6 +346,12 @@ test.describe("Point 1 — raise a quotation from a lead row", () => {
     const picker = page.getByTestId("send-document-picker");
     await expect(picker).toBeVisible();
     await expect(picker.locator("option")).toContainText([/No document/, /QTN-/]);
+
+    // The lead is swept in afterAll, but nothing sweeps the quotation raised
+    // through the UI — without this every run left one behind.
+    for (const d of docs as { id: string }[]) {
+      await ctx.delete(`${API}/quotations/${d.id}`).catch(() => undefined);
+    }
   });
 });
 

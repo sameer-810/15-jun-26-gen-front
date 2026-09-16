@@ -35,6 +35,8 @@ export async function listReminders(params: {
   leadId?: string;
   status?: ReminderStatus;
   mine?: "true" | "false";
+  /** ISO timestamp — only reminders due by then. */
+  dueBefore?: string;
   page?: number;
   limit?: number;
 }) {
@@ -46,6 +48,12 @@ export async function listReminders(params: {
 
 export async function createReminder(payload: { lead: string; remindAt: string; note?: string }) {
   const res = await http.post<{ data: Reminder }>("/reminders", payload);
+  return res.data.data;
+}
+
+/** Move a reminder or change its note — the pop-up's Snooze uses this. */
+export async function updateReminder(id: string, payload: { remindAt?: string; note?: string }) {
+  const res = await http.patch<{ data: Reminder }>(`/reminders/${id}`, payload);
   return res.data.data;
 }
 

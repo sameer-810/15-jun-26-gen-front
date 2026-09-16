@@ -9,6 +9,7 @@ import {
   createReminder,
   setReminderStatus,
   deleteReminder,
+  updateReminder,
   getLeadWorkspace,
   logCall,
   type CallOutcome,
@@ -110,6 +111,15 @@ export function useSetReminderStatus() {
 export function useDeleteReminder() {
   const invalidate = useLeadInvalidator();
   return useMutation({ mutationFn: deleteReminder, onSuccess: invalidate });
+}
+
+export function useUpdateReminder() {
+  const invalidate = useLeadInvalidator();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: { id: string; remindAt?: string; note?: string }) =>
+      updateReminder(id, payload),
+    onSuccess: invalidate,
+  });
 }
 
 // ── Workspace ─────────────────────────────────────────────────────────────

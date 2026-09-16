@@ -40,8 +40,31 @@ export async function adminApi(): Promise<{ ctx: APIRequestContext; token: strin
 /**
  * Log in through the UI. Uses the real form rather than seeding localStorage so
  * the auth flow itself stays covered.
+ *
+ * The reminder pop-up is off by default. These tests run against a database
+ * holding real users' reminders, and an overdue one owned by the admin sits over
+ * the bottom-right of every screen, where row actions live, so unrelated tests
+ * failed on clicks it intercepted. reminder-popup.spec.ts turns it back on.
+ *
+ * Done by answering the one request only the pop-up makes (the `dueBefore`
+ * poll) with an empty list, so the application carries no test switch. The real
+ * response is fetched and its body replaced, which keeps the CORS headers the
+ * browser checks on this cross-origin call.
  */
-export async function uiLogin(page: Page) {
+export async function uiLogin(
+  page: Page,
+  { reminderAlerts = false }: { reminderAlerts?: boolean } = {},
+) {
+  if (!reminderAlerts) {
+    await page.route(
+      (url) => url.pathname.endsWith("/api/reminders") && url.searchParams.has("dueBefore"),
+      async (route) => {
+        if (route.request().method() !== "GET") return route.continue();
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { success: true, data: [], meta: { total: 0 } } });
+      },
+    );
+  }
   await page.goto("/login");
   // Keyed on the field ids, not the placeholder. This helper runs in every
   // spec, and it silently took the whole suite down when the login page was

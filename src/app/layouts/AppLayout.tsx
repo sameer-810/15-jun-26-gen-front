@@ -5,6 +5,7 @@ import { Topbar } from "./Topbar";
 import { MobileTabBar } from "./MobileTabBar";
 import { SidebarProvider } from "./sidebarContext";
 import { PageLoader } from "@/shared/components/PageLoader";
+import { ReminderAlerts } from "@/modules/lead/components/ReminderAlerts";
 
 export function AppLayout() {
   return (
@@ -26,6 +27,8 @@ export function AppLayout() {
           </main>
         </div>
         <MobileTabBar />
+        {/* In the shell so a due reminder reaches you on whichever screen you are on. */}
+        <ReminderAlerts />
       </div>
     </SidebarProvider>
   );

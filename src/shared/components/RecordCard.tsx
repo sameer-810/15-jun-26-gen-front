@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
  *     │ (RK)  Rajesh Kumar          ₹4,50,000│   disc · title · amount
  *     │       Pune · 125 kVA · ×3       [HOT]│   meta · badge
  *     │       ──────────────────────────────  │
+ *     │       [Remark] [Reminder] [Status] …  │   quickActions (optional)
  *     │       [ Call ]  [ WhatsApp ]      ⋯  │   actions
  *     └──────────────────────────────────────┘
  *
@@ -25,6 +26,7 @@ export function RecordCard({
   meta,
   amount,
   badge,
+  quickActions,
   actions,
   onClick,
   className,
@@ -40,6 +42,11 @@ export function RecordCard({
   amount?: ReactNode;
   /** Status. Colour belongs here and nowhere else on the card. */
   badge?: ReactNode;
+  /**
+   * Updates to the record that take one tap and no trip into it — mark a call,
+   * set a reminder. A row of `CardChip`s above the actions.
+   */
+  quickActions?: ReactNode;
   /** Quick actions, rendered in a row beneath a hairline. */
   actions?: ReactNode;
   onClick?: () => void;
@@ -101,8 +108,22 @@ export function RecordCard({
         </div>
       </div>
 
+      {quickActions && (
+        <div className="mt-3 flex items-center gap-1.5 border-t border-border pt-2.5">
+          {quickActions}
+        </div>
+      )}
+
       {actions && (
-        <div className="mt-3 flex items-center gap-2 border-t border-border pt-2.5">{actions}</div>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            // One hairline for the whole action block, not one per row.
+            quickActions ? "mt-1.5" : "mt-3 border-t border-border pt-2.5",
+          )}
+        >
+          {actions}
+        </div>
       )}
     </>
   );
@@ -179,7 +200,19 @@ export function CardAction({
   // stopPropagation so tapping an action never also opens the record behind it.
   if (href && !disabled) {
     return (
-      <a href={href} className={cls} onClick={(e) => e.stopPropagation()} {...rest}>
+      <a
+        href={href}
+        className={cls}
+        onClick={(e) => {
+          e.stopPropagation();
+          // A link can also have something to do in the app. The lead's Call
+          // button is `tel:` *and* opens the call-result sheet; this handler
+          // used to be dropped for links, so on a phone the dialler opened and
+          // the result was never asked for.
+          onClick?.();
+        }}
+        {...rest}
+      >
         {inner}
       </a>
     );
@@ -196,6 +229,35 @@ export function CardAction({
       {...rest}
     >
       {inner}
+    </button>
+  );
+}
+
+/**
+ * A one-tap update on a card — "Remark", "Reminder", "Status".
+ *
+ * Text only and neutral. Four of these share a 330px row, so an icon each would
+ * push the labels into truncation, and colour on a control that repeats on every
+ * card is the decoration DESIGN.md rules out: the status badge is the one
+ * coloured thing on a card, which is what keeps it readable as status.
+ */
+export function CardChip({
+  label,
+  onClick,
+  ...rest
+}: { label: string; onClick: () => void } & Record<string, unknown>) {
+  return (
+    <button
+      type="button"
+      className="pg-tap flex flex-1 items-center justify-center rounded-lg border border-border px-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent"
+      // stopPropagation so tapping a chip never also opens the record behind it.
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      {...rest}
+    >
+      {label}
     </button>
   );
 }

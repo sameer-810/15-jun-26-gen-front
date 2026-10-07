@@ -5,6 +5,7 @@ import { MENU, filterMenu, type MenuItem } from "./menu";
 import { useTheme } from "@/app/theme";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { clearAuth } from "@/modules/auth/authSlice";
+import { beforeSignOut } from "@/shared/lib/signOut";
 import { cn } from "@/lib/utils";
 
 type Cmd = {
@@ -63,8 +64,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       hint: "Account",
       icon: LogOut,
       run: () => {
-        dispatch(clearAuth());
-        navigate("/login");
+        void beforeSignOut().then(() => {
+          dispatch(clearAuth());
+          navigate("/login");
+        });
       },
     });
     return [...actions, ...dest];

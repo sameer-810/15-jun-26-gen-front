@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import {
   listLeadLabels,
   createLeadLabel,
@@ -15,6 +15,21 @@ import {
   type CallOutcome,
 } from "../api/leadWorkspaceApi";
 import type { ReminderStatus } from "../types.labels";
+import type { Lead } from "../types";
+
+/**
+ * Write a saved lead into every cached page of the lead list.
+ *
+ * The list is refetched anyway, but on a slow connection that is a second or
+ * two in which the card still shows the old state — long enough for someone
+ * marking calls down a list to wonder whether the tap registered and mark it
+ * again. The server's reply is already the truth, so it is shown at once.
+ */
+function patchLeadInLists(qc: QueryClient, lead: Lead) {
+  qc.setQueriesData<{ items: Lead[] }>({ queryKey: ["leads", "list"] }, (old) =>
+    old ? { ...old, items: old.items.map((l) => (l.id === lead.id ? { ...l, ...lead } : l)) } : old,
+  );
+}
 
 /**
  * Anything that changes a lead can change what the workspace, the list and the
@@ -133,6 +148,7 @@ export function useLeadWorkspace(leadId: string | undefined) {
 }
 
 export function useLogCall() {
+  const qc = useQueryClient();
   const invalidate = useLeadInvalidator();
   return useMutation({
     mutationFn: ({
@@ -144,6 +160,9 @@ export function useLogCall() {
       outcome?: CallOutcome;
       note?: string;
     }) => logCall(leadId, { outcome, note }),
-    onSuccess: invalidate,
+    onSuccess: (lead) => {
+      patchLeadInLists(qc, lead);
+      invalidate();
+    },
   });
 }

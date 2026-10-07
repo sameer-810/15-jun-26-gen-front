@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { ResourceListPage } from "@/modules/common/ResourceListPage";
 import { Sheet } from "@/shared/components/Sheet";
-import { RecordCard, CardAction } from "@/shared/components/RecordCard";
+import { RecordCard, CardAction, CardChip } from "@/shared/components/RecordCard";
 import { cn, initialsOf } from "@/lib/utils";
 import { LeadDialog } from "../components/LeadDialog";
 import { FollowUpDialog } from "../components/FollowUpDialog";
@@ -26,7 +26,7 @@ import { QuotationDialog } from "@/modules/quotation/components/QuotationDialog"
 import { LeadImportDialog } from "../components/LeadImportDialog";
 import { LeadCitySelect } from "../components/LeadCitySelect";
 import { SendMessageDialog } from "@/modules/messaging/components/SendMessageDialog";
-import { useLogCall } from "../hooks/useLeadWorkspace";
+import { LeadQuickSheet, type LeadQuick } from "../components/LeadQuickSheet";
 import type { MessageChannel } from "@/modules/messaging/types";
 import {
   useLeads,
@@ -43,12 +43,13 @@ import {
   LEAD_SOURCES,
   BULK_DELETABLE_LEAD_STATUSES,
   LABEL_COLOR_CLASSES,
-  CALL_OUTCOMES,
   CALL_OUTCOME_LABELS,
 } from "../constants/lead.constants";
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
+import { useSessionState } from "@/shared/hooks/useSessionState";
+import { clearMemory, readMemory, writeMemory } from "@/shared/lib/sessionMemory";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import type { Lead, LeadListQuery, LeadStatus, LeadSource, CallFilter } from "../types";
 import type { QuotationPrefill } from "@/modules/quotation/types";
@@ -126,6 +127,9 @@ function leadToQuotationPrefill(lead: Lead): QuotationPrefill {
   };
 }
 
+/** Tab-memory key for a call placed but not yet marked. See `quick` below. */
+const PENDING_CALL_KEY = "leads.pendingCall";
+
 export function LeadListPage() {
   const role = useAppSelector((s) => s.auth.user?.role);
   const canDelete = role === "admin";
@@ -134,11 +138,13 @@ export function LeadListPage() {
   // Distributing leads across the team is a sales-manager job, so managers get
   // it too. Matches the guard on POST /leads/bulk-assign.
   const canAssign = role === "admin" || role === "manager";
-  const [status, setStatus] = useState<LeadStatus | "">("");
-  const [source, setSource] = useState<LeadSource | "">("");
-  const [location, setLocation] = useState("");
-  const [minQty, setMinQty] = useState("");
-  const [maxQty, setMaxQty] = useState("");
+  // Filters are kept for the tab, like the list's page and search: opening a
+  // lead and coming back must not quietly drop "Not called" and show everything.
+  const [status, setStatus] = useSessionState<LeadStatus | "">("list./leads.status", "");
+  const [source, setSource] = useSessionState<LeadSource | "">("list./leads.source", "");
+  const [location, setLocation] = useSessionState("list./leads.location", "");
+  const [minQty, setMinQty] = useSessionState("list./leads.minQty", "");
+  const [maxQty, setMaxQty] = useSessionState("list./leads.maxQty", "");
 
   // Follow-up dialog state (kept here since ResourceListPage owns its own dialog).
   const [followLead, setFollowLead] = useState<Lead | null>(null);
@@ -152,13 +158,24 @@ export function LeadListPage() {
   const [importOpen, setImportOpen] = useState(false);
   // Send dialog — one component, opened per channel from the row.
   const [sendTo, setSendTo] = useState<{ lead: Lead; channel: MessageChannel } | null>(null);
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useSessionState("list./leads.startDate", "");
+  const [endDate, setEndDate] = useSessionState("list./leads.endDate", "");
   // Answered / unanswered toggle. "" is all leads.
-  const [callFilter, setCallFilter] = useState<CallFilter | "">("");
-  const logCall = useLogCall();
-  // The lead we are waiting on a call outcome for. See the call button below.
-  const [callOutcomeFor, setCallOutcomeFor] = useState<Lead | null>(null);
+  const [callFilter, setCallFilter] = useSessionState<CallFilter | "">(
+    "list./leads.callFilter",
+    "",
+  );
+  /*
+    The quick sheet open on a lead — call result, reminder or status.
+
+    A call waiting to be marked is also kept in tab memory. Tapping Call hands
+    the phone to the dialler, and Android may discard this tab while the call is
+    on; without this, the "how did it go?" sheet is gone when the salesperson
+    comes back and the call is never marked.
+  */
+  const [quick, setQuick] = useState<LeadQuick | null>(() =>
+    readMemory<LeadQuick | null>(PENDING_CALL_KEY, null),
+  );
   // Mobile only: the lead whose overflow action sheet is open, and the lead
   // being edited from it. ResourceListPage owns the *create* dialog, so an edit
   // launched from the card needs its own LeadDialog instance.
@@ -166,21 +183,19 @@ export function LeadListPage() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
 
   /**
-   * Record the attempt. `outcome` is undefined when the user dismisses the
-   * prompt — the call still happened and still belongs in the history, we just
-   * do not know how it went. The backend already treats outcome as optional,
-   * so "attempted, result unknown" is a state the data can represent honestly
-   * instead of being rounded up to "connected".
+   * The Call button: the dialler opens, and the result is asked for when the
+   * user comes back. It is never guessed — recording "connected" here would
+   * invert the answered figures everything in SRS 3.2 is built on.
    */
-  async function recordCall(outcome?: string) {
-    const lead = callOutcomeFor;
-    if (!lead) return;
-    setCallOutcomeFor(null);
-    try {
-      await logCall.mutateAsync({ leadId: lead.id, outcome: outcome as never });
-    } catch (err) {
-      toast.error(getApiErrorMessage(err));
-    }
+  function askCallResult(lead: Lead) {
+    const pending: LeadQuick = { kind: "remark", lead, afterCall: true };
+    writeMemory(PENDING_CALL_KEY, pending);
+    setQuick(pending);
+  }
+
+  function closeQuick() {
+    clearMemory(PENDING_CALL_KEY);
+    setQuick(null);
   }
 
   const bulkDelete = useBulkDeleteLeads();
@@ -720,7 +735,7 @@ export function LeadListPage() {
                   they would have read 100% answered forever, and looked
                   entirely plausible while staff were judged on them.
                 */
-                if (lead.mobile) setCallOutcomeFor(lead);
+                if (lead.mobile) askCallResult(lead);
               }}
               data-testid={`call-${lead.id}`}
               aria-disabled={!lead.mobile}
@@ -798,7 +813,12 @@ export function LeadListPage() {
           26px icon buttons at the far right of a 1500px row, so getting to
           either meant panning sideways past nine columns. Everything else —
           edit, quote, follow-ups, timeline, convert — is one tap away under
-          "More", which keeps the card to one decision.
+          "More".
+
+          Above them sits a row of one-tap updates — Remark, Reminder, Status,
+          History — because working a follow-up list used to mean opening every
+          lead to mark its call and set its date. Each opens a small sheet where
+          a tap saves, and the list underneath does not move.
         */
         renderMobileCard={(lead, { onRequestDelete }) => (
           <RecordCard
@@ -807,6 +827,15 @@ export function LeadListPage() {
             title={lead.customerName}
             amount={lead.estimatedValue ? formatCurrency(lead.estimatedValue) : undefined}
             meta={[
+              /*
+                When the enquiry arrived, first and on every card. The desktop
+                table leads with this column; the card had dropped it, which
+                left no way to tell this morning's lead from last month's while
+                deciding whom to call.
+              */
+              <span className="font-mono tabular-nums">
+                {formatDateTime(lead.externalCreatedAt || lead.createdAt)}
+              </span>,
               lead.city,
               lead.requiredKva ? `${lead.requiredKva} kVA` : null,
               lead.quantity && lead.quantity > 1 ? `×${lead.quantity}` : null,
@@ -841,6 +870,32 @@ export function LeadListPage() {
                 {LEAD_STATUS_LABELS[lead.status]}
               </span>
             }
+            quickActions={
+              <>
+                <CardChip
+                  label="Remark"
+                  data-testid={`remark-${lead.id}`}
+                  onClick={() => setQuick({ kind: "remark", lead })}
+                />
+                <CardChip
+                  label="Reminder"
+                  data-testid={`reminder-chip-${lead.id}`}
+                  onClick={() => setQuick({ kind: "reminder", lead })}
+                />
+                <CardChip
+                  label="Status"
+                  data-testid={`status-chip-${lead.id}`}
+                  onClick={() => setQuick({ kind: "status", lead })}
+                />
+                <CardChip
+                  label="History"
+                  onClick={() => {
+                    setTimelineLead(lead);
+                    setTimelineOpen(true);
+                  }}
+                />
+              </>
+            }
             actions={
               <>
                 <CardAction
@@ -852,7 +907,7 @@ export function LeadListPage() {
                   // Same contract as the desktop row: opening the dialler starts
                   // the call, the outcome is asked for when the user comes back.
                   // Recording "connected" here would invert the answered figures.
-                  onClick={() => lead.mobile && setCallOutcomeFor(lead)}
+                  onClick={() => lead.mobile && askCallResult(lead)}
                 />
                 <CardAction
                   icon={MessageCircle}
@@ -1032,51 +1087,8 @@ export function LeadListPage() {
         to={sendTo?.channel === "email" ? sendTo?.lead.email : sendTo?.lead.mobile}
       />
 
-      {/*
-        Call outcome prompt.
-
-        Deliberately unskippable-by-accident but trivially skippable on purpose:
-        "Not sure" records the attempt with no outcome. The one thing it must
-        never do is guess, because everything the SRS asks for in 3.2 — the
-        answered/unanswered filter and the daily report — is built on this
-        single field.
-      */}
-      {callOutcomeFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="pg-overlay w-full max-w-sm p-6" role="dialog" aria-modal="true">
-            <h3 className="text-base font-semibold text-foreground">How did the call go?</h3>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              {callOutcomeFor.customerName}
-              {callOutcomeFor.mobile ? (
-                <span className="font-mono tabular-nums"> · {callOutcomeFor.mobile}</span>
-              ) : null}
-            </p>
-            <div className="mt-4 grid gap-1.5">
-              {CALL_OUTCOMES.map((o) => (
-                <button
-                  key={o}
-                  data-testid={`call-outcome-${o}`}
-                  onClick={() => recordCall(o)}
-                  disabled={logCall.isPending}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:border-primary hover:bg-accent disabled:opacity-50"
-                >
-                  {CALL_OUTCOME_LABELS[o]}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                data-testid="call-outcome-unknown"
-                onClick={() => recordCall(undefined)}
-                disabled={logCall.isPending}
-                className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-              >
-                Not sure — just log the attempt
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Call result, reminder and status — one tap each, from the card. */}
+      <LeadQuickSheet quick={quick} onClose={closeQuick} />
 
       {/* Bulk assignment — SRS 3.2. */}
       {assignBulk && (

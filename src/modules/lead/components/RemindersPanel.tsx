@@ -4,6 +4,7 @@ import { useReminders, useSetReminderStatus } from "../hooks/useLeadWorkspace";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { formatDateTime } from "@/lib/utils";
+import { PushOptIn } from "@/shared/components/PushOptIn";
 
 /**
  * "What do I owe someone a call about?" — my pending reminders, soonest first,
@@ -44,6 +45,9 @@ export function RemindersPanel({ limit = 6 }: { limit?: number }) {
           </span>
         ) : null}
       </div>
+
+      {/* Whether a reminder will reach this device when the CRM is closed. */}
+      <PushOptIn showStatus className="mb-3" />
 
       {isLoading ? (
         <div className="flex justify-center py-8">

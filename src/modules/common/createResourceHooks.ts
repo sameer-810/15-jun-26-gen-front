@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export function createResourceHooks<
   TListQuery extends object,
@@ -19,12 +19,21 @@ export function createResourceHooks<
     list: (filters: TListQuery) => [...KEYS.lists(), filters] as const,
   };
 
-  /** `enabled: false` holds the request back until the caller has what it needs. */
-  function useList(query: TListQuery, options?: { enabled?: boolean }) {
+  /**
+   * `enabled: false` holds the request back until the caller has what it needs.
+   *
+   * `keepPrevious` leaves the rows already on screen in place while the next
+   * page, search or filter loads, instead of swapping the whole list for a
+   * spinner. Opt-in, because it is only right for a list someone is reading: a
+   * picker scoped to one record must never show another record's rows, even for
+   * a moment.
+   */
+  function useList(query: TListQuery, options?: { enabled?: boolean; keepPrevious?: boolean }) {
     return useQuery({
       queryKey: KEYS.list(query),
       queryFn: () => api.list(query),
       enabled: options?.enabled ?? true,
+      placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
     });
   }
 

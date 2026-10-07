@@ -7,6 +7,8 @@ import { useSetReminderStatus, useUpdateReminder } from "../hooks/useLeadWorkspa
 import { useAppSelector } from "@/app/hooks";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
+import { notifyFromPage } from "@/shared/lib/push";
+import { PushOptIn } from "@/shared/components/PushOptIn";
 import { formatDateTime } from "@/lib/utils";
 import type { Reminder } from "../types.labels";
 
@@ -97,9 +99,6 @@ export function ReminderAlerts() {
 
   const [hiddenUntil, setHiddenUntil] = useState<Record<string, number>>(readHidden);
   const [now, setNow] = useState(() => Date.now());
-  const [permission, setPermission] = useState(() =>
-    typeof Notification === "undefined" ? "unsupported" : Notification.permission,
-  );
 
   const { data } = useQuery({
     queryKey: ["reminders", "due-alerts"],
@@ -136,24 +135,23 @@ export function ReminderAlerts() {
     fresh.forEach((r) => announced.current.add(r.id));
     chime();
 
-    if (
-      document.hidden &&
-      typeof Notification !== "undefined" &&
-      Notification.permission === "granted"
-    ) {
+    /*
+      A system notification when the tab is in the background. This used to be
+      `new Notification(...)`, which Android Chrome rejects with an error, so on
+      a phone it could never have worked. It now goes through the service
+      worker — and stands down entirely on a device with push turned on, where
+      the server sends this same notification whether or not the tab is alive.
+    */
+    if (document.hidden) {
       for (const r of fresh.slice(0, 3)) {
-        const n = new Notification(`Reminder: ${r.lead?.customerName ?? "Lead"}`, {
+        void notifyFromPage(`Reminder: ${r.lead?.customerName ?? "Lead"}`, {
           body: r.note || `Due ${formatDateTime(r.remindAt)}`,
           tag: `reminder-${r.id}`,
+          url: `/leads/${r.leadId}`,
         });
-        n.onclick = () => {
-          window.focus();
-          navigate(`/leads/${r.leadId}`);
-          n.close();
-        };
       }
     }
-  }, [due, navigate]);
+  }, [due]);
 
   // "(2) Reminder · SRF Power Machine" — visible from another tab.
   useEffect(() => {
@@ -202,11 +200,6 @@ export function ReminderAlerts() {
     // Out of the way while they work on it; it is still pending until Done.
     later([r.id]);
     navigate(`/leads/${r.leadId}`);
-  }
-
-  async function allowDesktopAlerts() {
-    if (typeof Notification === "undefined") return;
-    setPermission(await Notification.requestPermission());
   }
 
   if (!enabled || due.length === 0) return null;
@@ -313,14 +306,8 @@ export function ReminderAlerts() {
         })}
       </ul>
 
-      {permission === "default" && (
-        <p className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-          Get these even when the CRM tab is in the background.{" "}
-          <button onClick={allowDesktopAlerts} className="font-medium text-primary hover:underline">
-            Allow desktop alerts
-          </button>
-        </p>
-      )}
+      {/* Renders nothing once this device has notifications on. */}
+      <PushOptIn className="rounded-none border-x-0 border-b-0 px-4" />
     </section>
   );
 }

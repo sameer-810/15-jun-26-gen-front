@@ -4,6 +4,7 @@ import { MoreHorizontal, LogOut, Moon, Sun } from "lucide-react";
 import { filterSections, mobileTabs } from "./menu";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { clearAuth } from "@/modules/auth/authSlice";
+import { beforeSignOut } from "@/shared/lib/signOut";
 import { useTheme } from "@/app/theme";
 import { Sheet } from "@/shared/components/Sheet";
 import { cn } from "@/lib/utils";
@@ -55,8 +56,9 @@ export function MobileTabBar() {
     navigate(to);
   }
 
-  function logout() {
+  async function logout() {
     setMoreOpen(false);
+    await beforeSignOut();
     dispatch(clearAuth());
     navigate("/login", { replace: true });
   }

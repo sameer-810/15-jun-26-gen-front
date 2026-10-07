@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Pencil,
   Plus,
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from "@/shared/api/http";
 import { toast } from "@/shared/lib/toast";
 import { useIsMobile } from "@/shared/hooks/useMediaQuery";
+import { useSessionState } from "@/shared/hooks/useSessionState";
+import { readMemory, writeMemory } from "@/shared/lib/sessionMemory";
 import { Sheet } from "@/shared/components/Sheet";
 import { Fab } from "@/shared/components/Fab";
 import { RecordCard } from "@/shared/components/RecordCard";
@@ -78,12 +80,17 @@ interface ResourceListPageProps<TItem extends { id: string }, TQuery extends obj
    */
   headerActions?: React.ReactNode;
   columns: Column<TItem>[];
-  useList: (query: TQuery) => {
+  useList: (
+    query: TQuery,
+    options?: { keepPrevious?: boolean },
+  ) => {
     data?: {
       items: TItem[];
       meta: { total: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean };
     };
     isLoading: boolean;
+    /** True while the rows shown still belong to the previous page or filter. */
+    isPlaceholderData?: boolean;
     error: unknown;
     refetch: () => Promise<unknown>;
   };
@@ -198,6 +205,9 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
 }: ResourceListPageProps<TItem, TQuery>) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  // Everything this list remembers is filed under the screen it belongs to.
+  const { pathname } = useLocation();
+  const memKey = `list.${pathname}`;
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   /**
    * Mobile-only selection mode.
@@ -209,25 +219,39 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
    * from a customer's site, so it is opt-in: tap Select, the checkboxes appear.
    */
   const [selectMode, setSelectMode] = useState(false);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  /*
+    Where you are in the list outlives the screen.
+
+    These were plain state, so opening a record and pressing Back rebuilt the
+    list at page 1 with the search cleared — and working down a follow-up list
+    means doing exactly that for every lead on it. Kept for the tab instead, so
+    Back returns to the same page of the same search.
+  */
+  const [search, setSearch] = useSessionState(`${memKey}.search`, "");
+  const [page, setPage] = useSessionState(`${memKey}.page`, 1);
+  const [pageSize, setPageSize] = useSessionState(`${memKey}.pageSize`, 50);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<TItem | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
 
-  const setSearchAndReset = useCallback((v: string) => {
-    setSearch(v);
-    setPage(1);
-  }, []);
+  const setSearchAndReset = useCallback(
+    (v: string) => {
+      setSearch(v);
+      setPage(1);
+    },
+    [setSearch, setPage],
+  );
   const query = useMemo(
     () => buildQuery({ search, page, limit: pageSize }),
     [buildQuery, search, page, pageSize],
   );
 
-  const { data, isLoading, error, refetch } = useList(query);
+  // The rows on screen stay put while the next page, search or filter loads.
+  const { data, isLoading, isPlaceholderData, error, refetch } = useList(query, {
+    keepPrevious: true,
+  });
   const deleteMutation = useDelete?.();
   // Memoised so downstream useMemo/useEffect deps don't churn on every render
   // (the `?? []` fallback would otherwise be a fresh array each time).
@@ -249,8 +273,87 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   const rangeEnd = total === 0 ? 0 : Math.min(page * pageSize, total);
 
   useEffect(() => {
-    if (!isLoading && page > totalPages) setPage(totalPages);
-  }, [page, totalPages, isLoading]);
+    // Not while the previous page's rows are standing in: their page count is
+    // for the query that was, not the one being loaded.
+    if (!isLoading && !isPlaceholderData && page > totalPages) setPage(totalPages);
+  }, [page, totalPages, isLoading, isPlaceholderData, setPage]);
+
+  /*
+    Scroll position, remembered with the page number.
+
+    The page scrolls inside the shell's <main>, which outlives this screen, so
+    the position is saved from there and put back once the rows it refers to
+    exist. Returning to a list of fifty cards at the top, when you were on the
+    thirty-first, costs a long scroll per lead.
+
+    The listener is attached in a layout effect so it is gone before the next
+    screen's shorter content clamps the scroller — that clamp fires a scroll
+    event, and saving it would overwrite the position being kept.
+  */
+  const rootRef = useRef<HTMLDivElement>(null);
+  const scrollRestored = useRef(false);
+  const scrollToTopOnData = useRef(false);
+
+  useLayoutEffect(() => {
+    const scroller = rootRef.current?.closest("main");
+    if (!scroller) return;
+    let frame = 0;
+    const onScroll = () => {
+      // Until the saved position is back, the only scroll events are the
+      // browser settling at zero.
+      if (!scrollRestored.current) return;
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (rootRef.current) writeMemory(`${memKey}.scroll`, scroller.scrollTop);
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [memKey]);
+
+  // A passive effect, so it runs after the shell has reset the scroller for the
+  // new screen rather than before it.
+  useEffect(() => {
+    if (!data || isPlaceholderData) return;
+    const scroller = rootRef.current?.closest("main");
+    if (!scrollRestored.current) {
+      scrollRestored.current = true;
+      const top = readMemory(`${memKey}.scroll`, 0);
+      if (top > 0 && scroller) {
+        scroller.scrollTo({ top });
+        /*
+          On a fresh page load this runs before the web font has arrived. The
+          cards above then re-wrap to their final height and the view drifts by
+          a few dozen pixels. So put the position back once the font is in —
+          unless the person has already scrolled away, when it is theirs.
+        */
+        if (document.fonts && document.fonts.status !== "loaded") {
+          void document.fonts.ready.then(() => {
+            if (rootRef.current && Math.abs(scroller.scrollTop - top) < 150) {
+              scroller.scrollTo({ top });
+            }
+          });
+        }
+      }
+      return;
+    }
+    if (scrollToTopOnData.current) {
+      scrollToTopOnData.current = false;
+      scroller?.scrollTo({ top: 0 });
+    }
+  }, [data, isPlaceholderData, memKey]);
+
+  /** Turning the page is the one time a list should jump to its own top. */
+  const goToPage = useCallback(
+    (next: number | ((p: number) => number)) => {
+      scrollToTopOnData.current = true;
+      setPage(next);
+    },
+    [setPage],
+  );
 
   // Selection is page-local: changing the page, search or any filter clears it
   // so a bulk action can never reach rows the user is no longer looking at.
@@ -339,7 +442,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
   }, [page, totalPages]);
 
   return (
-    <div className="erp-page">
+    <div className="erp-page" ref={rootRef}>
       {/*
         Header.
 
@@ -554,7 +657,9 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         extend the page and the whole thing scrolls once.
       */}
       {isMobile && (
-        <div className="space-y-2">
+        // Dimmed, not replaced, while the next page loads: swapping fifty cards
+        // for a spinner collapses the page and throws the scroll to the top.
+        <div className={cn("space-y-2 transition-opacity", isPlaceholderData && "opacity-60")}>
           {isLoading ? (
             <div className="flex justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -810,7 +915,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         {/* Desktop: full pager. */}
         <div className="hidden items-center gap-1 md:flex">
           <button
-            onClick={() => setPage(1)}
+            onClick={() => goToPage(1)}
             disabled={!hasPrev}
             aria-label="First page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
@@ -818,7 +923,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             <ChevronsLeft className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => goToPage((p) => p - 1)}
             disabled={!hasPrev}
             aria-label="Previous page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
@@ -833,7 +938,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             ) : (
               <button
                 key={n}
-                onClick={() => setPage(n as number)}
+                onClick={() => goToPage(n as number)}
                 aria-current={page === n ? "page" : undefined}
                 className={cn(
                   "h-7 w-7 rounded font-mono text-sm tabular-nums transition-colors",
@@ -847,7 +952,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             ),
           )}
           <button
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => goToPage((p) => p + 1)}
             disabled={!hasNext}
             aria-label="Next page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
@@ -855,7 +960,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             <ChevronRight className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setPage(totalPages)}
+            onClick={() => goToPage(totalPages)}
             disabled={!hasNext}
             aria-label="Last page"
             className="rounded p-1 hover:bg-accent disabled:opacity-40"
@@ -867,7 +972,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         {/* Mobile: prev / page-of / next, all at thumb size. */}
         <div className="flex items-center gap-1 md:hidden">
           <button
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => goToPage((p) => p - 1)}
             disabled={!hasPrev}
             aria-label="Previous page"
             className="pg-tap flex items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors disabled:opacity-40"
@@ -878,7 +983,7 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
             {page}/{totalPages}
           </span>
           <button
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => goToPage((p) => p + 1)}
             disabled={!hasNext}
             aria-label="Next page"
             className="pg-tap flex items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors disabled:opacity-40"
@@ -887,6 +992,17 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
           </button>
         </div>
       </div>
+
+      {/*
+        Room for the pager to scroll clear of the FAB.
+
+        The shell's bottom padding stops 96px above the screen edge and the FAB's
+        top is 128px above it, so at the end of a list the FAB sat on the lower
+        half of "Next page" — the one control someone working down a list needs
+        there — and a tap on it opened New Lead instead. Only on screens that
+        have a FAB, so the others gain no dead space.
+      */}
+      {!hideCreateButton && renderDialog && <div className="h-10 md:hidden" aria-hidden="true" />}
 
       {/* The create action, lifted out of the header — see Fab. */}
       {!hideCreateButton && renderDialog && (
@@ -931,7 +1047,9 @@ export function ResourceListPage<TItem extends { id: string }, TQuery extends ob
         mode,
         value: editing,
         onSuccess: () => {
-          setPage(1);
+          // A new record lands at the top of page 1, so go and show it. An edit
+          // changes a row you are already looking at: stay exactly where you are.
+          if (mode === "create") setPage(1);
           void refetch();
         },
       })}

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/app/hooks";
 import { clearAuth } from "@/modules/auth/authSlice";
+import { beforeSignOut } from "@/shared/lib/signOut";
 import { useTheme } from "@/app/theme";
 import { useSidebar } from "./sidebarContext";
 import { Breadcrumbs } from "./Breadcrumbs";
@@ -72,7 +73,8 @@ export function Topbar() {
     return () => document.removeEventListener("mousedown", onClick);
   }, [menuOpen]);
 
-  function logout() {
+  async function logout() {
+    await beforeSignOut();
     dispatch(clearAuth());
     navigate("/login", { replace: true });
   }
